@@ -28,6 +28,8 @@ pub struct VulkanApp {
 
     //swapchain
     pub swapchain: vk::SwapchainKHR,
+    pub present_images: Vec<vk::Image>,
+    pub present_image_views: Vec<vk::ImageView>,
 
     //device & queue
     pub pdevice: vk::PhysicalDevice,
@@ -211,6 +213,31 @@ impl VulkanApp {
                 .create_swapchain(&swapchain_create_info, None)
                 .unwrap();
 
+            let present_images = swapchain_loader.get_swapchain_images(swapchain).unwrap();
+            let present_image_views: Vec<vk::ImageView> = present_images
+                .iter()
+                .map(|&image| {
+                    let create_view_info = vk::ImageViewCreateInfo::default()
+                        .view_type(vk::ImageViewType::TYPE_2D)
+                        .format(surface_format.format)
+                        .components(vk::ComponentMapping {
+                            r: vk::ComponentSwizzle::R,
+                            g: vk::ComponentSwizzle::G,
+                            b: vk::ComponentSwizzle::B,
+                            a: vk::ComponentSwizzle::A,
+                        })
+                        .subresource_range(vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        })
+                        .image(image);
+                    device.create_image_view(&create_view_info, None).unwrap()
+                })
+                .collect();
+
             Self {
                 entry,
                 instance,
@@ -226,6 +253,8 @@ impl VulkanApp {
                 surface_resolution,
                 swapchain,
                 swapchain_loader,
+                present_image_views,
+                present_images,
             }
         }
     }
@@ -234,6 +263,13 @@ impl VulkanApp {
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
+            for &image_view in self.present_image_views.iter() {
+                self.device.destroy_image_view(image_view, None);
+            }
+            for &image in self.present_images.iter() {
+                self.device.destroy_image(image, None);
+            }
+
             self.swapchain_loader
                 .destroy_swapchain(self.swapchain, None);
 

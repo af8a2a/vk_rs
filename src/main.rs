@@ -2,19 +2,31 @@ use std::borrow::Cow;
 use std::ffi::{self, c_char};
 
 use ash::ext::debug_utils;
+use ash::khr::surface;
 use ash::{vk, Entry};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::raw_window_handle::HasDisplayHandle;
+use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::{Window, WindowId};
 
 pub struct VulkanApp {
     pub entry: Entry,
     pub instance: ash::Instance,
+    //loader
+    pub surface_loader: surface::Instance,
     pub debug_utils_loader: debug_utils::Instance,
+    //debug
     pub debug_call_back: vk::DebugUtilsMessengerEXT,
+
+    //surface
+    pub surface: vk::SurfaceKHR,
+
+    //device & queue
+    pdevice: vk::PhysicalDevice,
+    pub queue_family_index: u32,
+
 }
 
 impl VulkanApp {
@@ -74,11 +86,58 @@ impl VulkanApp {
                 .create_debug_utils_messenger(&debug_info, None)
                 .unwrap();
 
+            let pdevices = instance
+                .enumerate_physical_devices()
+                .expect("Physical device error");
+
+            let surface = ash_window::create_surface(
+                &entry,
+                &instance,
+                window.display_handle().unwrap().as_raw(),
+                window.window_handle().unwrap().as_raw(),
+                None,
+            )
+            .unwrap();
+            let pdevices = instance
+                .enumerate_physical_devices()
+                .expect("Physical device error");
+            let surface_loader = surface::Instance::new(&entry, &instance);
+
+            let (pdevice, queue_family_index) = pdevices
+                .iter()
+                .find_map(|pdevice| {
+                    instance
+                        .get_physical_device_queue_family_properties(*pdevice)
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, info)| {
+                            let supports_graphic_and_surface =
+                                info.queue_flags.contains(vk::QueueFlags::GRAPHICS)
+                                    && surface_loader
+                                        .get_physical_device_surface_support(
+                                            *pdevice,
+                                            index as u32,
+                                            surface,
+                                        )
+                                        .unwrap();
+                            if supports_graphic_and_surface {
+                                Some((*pdevice, index as u32))
+                            } else {
+                                None
+                            }
+                        })
+                })
+                .expect("Couldn't find suitable device.");
+
             Self {
                 entry,
                 instance,
                 debug_call_back,
                 debug_utils_loader,
+                surface_loader,
+                surface,
+                pdevice,
+                queue_family_index
             }
         }
     }

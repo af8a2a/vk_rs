@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::ffi::{self, c_char};
 use std::io::Cursor;
+use std::mem::offset_of;
 
 use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
@@ -681,6 +682,67 @@ impl VulkanApp {
             let frag_code =
                 read_spv(&mut frag_spv_file).expect("Failed to read fragment shader spv file");
             let frag_shader_info = vk::ShaderModuleCreateInfo::default().code(&frag_code);
+
+            let vertex_shader_module = self
+                .device
+                .create_shader_module(&vertex_shader_info, None)
+                .expect("Vertex shader module error");
+
+            let fragment_shader_module = self
+                .device
+                .create_shader_module(&frag_shader_info, None)
+                .expect("Fragment shader module error");
+
+            let layout_create_info = vk::PipelineLayoutCreateInfo::default();
+
+            let pipeline_layout = self
+                .device
+                .create_pipeline_layout(&layout_create_info, None)
+                .unwrap();
+
+            let shader_entry_name = ffi::CStr::from_bytes_with_nul_unchecked(b"main\0");
+            let shader_stage_create_infos = [
+                vk::PipelineShaderStageCreateInfo {
+                    module: vertex_shader_module,
+                    p_name: shader_entry_name.as_ptr(),
+                    stage: vk::ShaderStageFlags::VERTEX,
+                    ..Default::default()
+                },
+                vk::PipelineShaderStageCreateInfo {
+                    s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    module: fragment_shader_module,
+                    p_name: shader_entry_name.as_ptr(),
+                    stage: vk::ShaderStageFlags::FRAGMENT,
+                    ..Default::default()
+                },
+            ];
+            let vertex_input_binding_descriptions = [vk::VertexInputBindingDescription {
+                binding: 0,
+                stride: size_of::<Vertex>() as u32,
+                input_rate: vk::VertexInputRate::VERTEX,
+            }];
+            let vertex_input_attribute_descriptions = [
+                vk::VertexInputAttributeDescription {
+                    location: 0,
+                    binding: 0,
+                    format: vk::Format::R32G32B32A32_SFLOAT,
+                    offset: offset_of!(Vertex, pos) as u32,
+                },
+                vk::VertexInputAttributeDescription {
+                    location: 1,
+                    binding: 0,
+                    format: vk::Format::R32G32B32A32_SFLOAT,
+                    offset: offset_of!(Vertex, color) as u32,
+                },
+            ];
+
+            let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::default()
+                .vertex_attribute_descriptions(&vertex_input_attribute_descriptions)
+                .vertex_binding_descriptions(&vertex_input_binding_descriptions);
+            let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
+                topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                ..Default::default()
+            };
         }
     }
 }

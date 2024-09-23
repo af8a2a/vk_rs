@@ -763,6 +763,65 @@ impl VulkanApp {
                 polygon_mode: vk::PolygonMode::FILL,
                 ..Default::default()
             };
+
+            let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
+                rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                ..Default::default()
+            };
+            let noop_stencil_state = vk::StencilOpState {
+                fail_op: vk::StencilOp::KEEP,
+                pass_op: vk::StencilOp::KEEP,
+                depth_fail_op: vk::StencilOp::KEEP,
+                compare_op: vk::CompareOp::ALWAYS,
+                ..Default::default()
+            };
+            let depth_state_info = vk::PipelineDepthStencilStateCreateInfo {
+                depth_test_enable: 1,
+                depth_write_enable: 1,
+                depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+                front: noop_stencil_state,
+                back: noop_stencil_state,
+                max_depth_bounds: 1.0,
+                ..Default::default()
+            };
+            let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
+                blend_enable: 0,
+                src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+                dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+                color_blend_op: vk::BlendOp::ADD,
+                src_alpha_blend_factor: vk::BlendFactor::ZERO,
+                dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                alpha_blend_op: vk::BlendOp::ADD,
+                color_write_mask: vk::ColorComponentFlags::RGBA,
+            }];
+            let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
+                .logic_op(vk::LogicOp::CLEAR)
+                .attachments(&color_blend_attachment_states);
+    
+            let dynamic_state = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+            let dynamic_state_info =
+                vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_state);
+    
+            let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo::default()
+                .stages(&shader_stage_create_infos)
+                .vertex_input_state(&vertex_input_state_info)
+                .input_assembly_state(&vertex_input_assembly_state_info)
+                .viewport_state(&viewport_state_info)
+                .rasterization_state(&rasterization_info)
+                .multisample_state(&multisample_state_info)
+                .depth_stencil_state(&depth_state_info)
+                .color_blend_state(&color_blend_state)
+                .dynamic_state(&dynamic_state_info)
+                .layout(pipeline_layout)
+                .render_pass(renderpass);
+    
+            let graphics_pipelines = self
+                .device
+                .create_graphics_pipelines(vk::PipelineCache::null(), &[graphic_pipeline_info], None)
+                .expect("Unable to create graphics pipeline");
+    
+            let graphic_pipeline = graphics_pipelines[0];
+    
     
         }
     }

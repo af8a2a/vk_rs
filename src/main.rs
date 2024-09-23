@@ -1,4 +1,3 @@
-
 use ash::Entry;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
@@ -6,32 +5,29 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
-
-
-pub struct VulkanApp{
+pub struct VulkanApp {
     pub entry: Entry,
-
+    pub instance: ash::Instance,
 }
 
-
-impl VulkanApp{
+impl VulkanApp {
     pub fn new() -> Self {
-        Self {
-            entry: Entry::linked(),
+        let entry = Entry::linked();
+        unsafe {
+            let instance_create_info = ash::vk::InstanceCreateInfo::default();
+            let instance = entry
+                .create_instance(&instance_create_info, None)
+                .expect("Failed to create instance");
+            Self { entry, instance }
         }
     }
 }
 
-
-
-
 #[derive(Default)]
 struct App {
     window: Option<Window>,
-    vk:Option<VulkanApp>,
+    vk: Option<VulkanApp>,
 }
-
-
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -44,16 +40,15 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
                 event_loop.exit();
             }
-            
+
             WindowEvent::RedrawRequested => {
-                if self.vk.is_some(){
-                    println!("load vulkan!");
+                if self.vk.is_some() {
+                    println!("create vulkan instance!");
                 }
                 self.window.as_ref().unwrap().request_redraw();
             }
@@ -75,6 +70,6 @@ fn main() {
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let mut app = App::default();
-    
+
     event_loop.run_app(&mut app).unwrap();
 }

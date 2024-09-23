@@ -527,7 +527,24 @@ impl VulkanApp {
                 .device
                 .create_render_pass(&renderpass_create_info, None)
                 .unwrap();
-            
+
+            let framebuffers: Vec<vk::Framebuffer> = self
+                .present_image_views
+                .iter()
+                .map(|&present_image_view| {
+                    let framebuffer_attachments = [present_image_view, self.depth_image_view];
+                    let frame_buffer_create_info = vk::FramebufferCreateInfo::default()
+                        .render_pass(renderpass)
+                        .attachments(&framebuffer_attachments)
+                        .width(self.surface_resolution.width)
+                        .height(self.surface_resolution.height)
+                        .layers(1);
+
+                    self.device
+                        .create_framebuffer(&frame_buffer_create_info, None)
+                        .unwrap()
+                })
+                .collect();
         }
     }
 }

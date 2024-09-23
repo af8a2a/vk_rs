@@ -1,5 +1,5 @@
-use std::num::NonZeroU32;
 
+use ash::Entry;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -8,9 +8,27 @@ use winit::window::{Window, WindowId};
 
 
 
+pub struct VulkanApp{
+    pub entry: Entry,
+
+}
+
+
+impl VulkanApp{
+    pub fn new() -> Self {
+        Self {
+            entry: Entry::linked(),
+        }
+    }
+}
+
+
+
+
 #[derive(Default)]
 struct App {
     window: Option<Window>,
+    vk:Option<VulkanApp>,
 }
 
 
@@ -22,6 +40,7 @@ impl ApplicationHandler for App {
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
+        self.vk = Some(VulkanApp::new());
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -33,6 +52,9 @@ impl ApplicationHandler for App {
             }
             
             WindowEvent::RedrawRequested => {
+                if self.vk.is_some(){
+                    println!("load vulkan!");
+                }
                 self.window.as_ref().unwrap().request_redraw();
             }
             _ => (),

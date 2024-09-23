@@ -743,6 +743,27 @@ impl VulkanApp {
                 topology: vk::PrimitiveTopology::TRIANGLE_LIST,
                 ..Default::default()
             };
+
+            let viewports = [vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: self.surface_resolution.width as f32,
+                height: self.surface_resolution.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }];
+            let scissors = [self.surface_resolution.into()];
+            let viewport_state_info = vk::PipelineViewportStateCreateInfo::default()
+                .scissors(&scissors)
+                .viewports(&viewports);
+    
+            let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
+                front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                line_width: 1.0,
+                polygon_mode: vk::PolygonMode::FILL,
+                ..Default::default()
+            };
+    
         }
     }
 }

@@ -2,10 +2,9 @@ use std::borrow::Cow;
 use std::ffi::{self, c_char};
 
 use ash::ext::debug_utils;
-use ash::khr::surface;
+use ash::khr::{surface, swapchain};
 use ash::{vk, Entry};
 use winit::application::ApplicationHandler;
-use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
@@ -14,6 +13,7 @@ use winit::window::{Window, WindowId};
 pub struct VulkanApp {
     pub entry: Entry,
     pub instance: ash::Instance,
+    pub device: ash::Device,
     //loader
     pub surface_loader: surface::Instance,
     pub debug_utils_loader: debug_utils::Instance,
@@ -24,9 +24,10 @@ pub struct VulkanApp {
     pub surface: vk::SurfaceKHR,
 
     //device & queue
-    pdevice: vk::PhysicalDevice,
-    pub queue_family_index: u32,
+    pub pdevice: vk::PhysicalDevice,
+    pub present_queue: vk::Queue,
 
+    pub queue_family_index: u32,
 }
 
 impl VulkanApp {
@@ -86,10 +87,6 @@ impl VulkanApp {
                 .create_debug_utils_messenger(&debug_info, None)
                 .unwrap();
 
-            let pdevices = instance
-                .enumerate_physical_devices()
-                .expect("Physical device error");
-
             let surface = ash_window::create_surface(
                 &entry,
                 &instance,
@@ -129,6 +126,28 @@ impl VulkanApp {
                 })
                 .expect("Couldn't find suitable device.");
 
+            let device_extension_names_raw = [swapchain::NAME.as_ptr()];
+            let features = vk::PhysicalDeviceFeatures {
+                shader_clip_distance: 1,
+                ..Default::default()
+            };
+            let priorities = [1.0];
+
+            let queue_info = vk::DeviceQueueCreateInfo::default()
+                .queue_family_index(queue_family_index)
+                .queue_priorities(&priorities);
+
+            let device_create_info = vk::DeviceCreateInfo::default()
+                .queue_create_infos(std::slice::from_ref(&queue_info))
+                .enabled_extension_names(&device_extension_names_raw)
+                .enabled_features(&features);
+
+            let device = instance
+                .create_device(pdevice, &device_create_info, None)
+                .unwrap();
+
+            let present_queue = device.get_device_queue(queue_family_index, 0);
+
             Self {
                 entry,
                 instance,
@@ -137,7 +156,9 @@ impl VulkanApp {
                 surface_loader,
                 surface,
                 pdevice,
-                queue_family_index
+                queue_family_index,
+                device,
+                present_queue,
             }
         }
     }
@@ -146,9 +167,13 @@ impl VulkanApp {
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
-            self.instance.destroy_instance(None);
+            self.device.destroy_device(None);
+            self.surface_loader.destroy_surface(self.surface, None);
             self.debug_utils_loader
                 .destroy_debug_utils_messenger(self.debug_call_back, None);
+            self.instance.destroy_instance(None);
+
+            
         }
     }
 }

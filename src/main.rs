@@ -17,11 +17,17 @@ pub struct VulkanApp {
     //loader
     pub surface_loader: surface::Instance,
     pub debug_utils_loader: debug_utils::Instance,
+    pub swapchain_loader: swapchain::Device,
     //debug
     pub debug_call_back: vk::DebugUtilsMessengerEXT,
 
     //surface
     pub surface: vk::SurfaceKHR,
+    pub surface_format: vk::SurfaceFormatKHR,
+    pub surface_resolution: vk::Extent2D,
+
+    //swapchain
+    pub swapchain: vk::SwapchainKHR,
 
     //device & queue
     pub pdevice: vk::PhysicalDevice,
@@ -148,6 +154,63 @@ impl VulkanApp {
 
             let present_queue = device.get_device_queue(queue_family_index, 0);
 
+            let surface_format = surface_loader
+                .get_physical_device_surface_formats(pdevice, surface)
+                .unwrap()[0];
+
+            let surface_capabilities = surface_loader
+                .get_physical_device_surface_capabilities(pdevice, surface)
+                .unwrap();
+            let mut desired_image_count = surface_capabilities.min_image_count + 1;
+            if surface_capabilities.max_image_count > 0
+                && desired_image_count > surface_capabilities.max_image_count
+            {
+                desired_image_count = surface_capabilities.max_image_count;
+            };
+
+            let surface_resolution = match surface_capabilities.current_extent.width {
+                u32::MAX => vk::Extent2D {
+                    width: window.current_monitor().unwrap().size().width,
+                    height: window.current_monitor().unwrap().size().height,
+                },
+                _ => surface_capabilities.current_extent,
+            };
+            let pre_transform = if surface_capabilities
+                .supported_transforms
+                .contains(vk::SurfaceTransformFlagsKHR::IDENTITY)
+            {
+                vk::SurfaceTransformFlagsKHR::IDENTITY
+            } else {
+                surface_capabilities.current_transform
+            };
+            let present_modes = surface_loader
+                .get_physical_device_surface_present_modes(pdevice, surface)
+                .unwrap();
+            let present_mode = present_modes
+                .iter()
+                .cloned()
+                .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
+                .unwrap_or(vk::PresentModeKHR::FIFO);
+            let swapchain_loader = swapchain::Device::new(&instance, &device);
+
+            let swapchain_create_info = vk::SwapchainCreateInfoKHR::default()
+                .surface(surface)
+                .min_image_count(desired_image_count)
+                .image_color_space(surface_format.color_space)
+                .image_format(surface_format.format)
+                .image_extent(surface_resolution)
+                .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+                .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
+                .pre_transform(pre_transform)
+                .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+                .present_mode(present_mode)
+                .clipped(true)
+                .image_array_layers(1);
+
+            let swapchain = swapchain_loader
+                .create_swapchain(&swapchain_create_info, None)
+                .unwrap();
+
             Self {
                 entry,
                 instance,
@@ -159,6 +222,10 @@ impl VulkanApp {
                 queue_family_index,
                 device,
                 present_queue,
+                surface_format,
+                surface_resolution,
+                swapchain,
+                swapchain_loader,
             }
         }
     }
@@ -167,13 +234,14 @@ impl VulkanApp {
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
+            self.swapchain_loader
+                .destroy_swapchain(self.swapchain, None);
+
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
             self.debug_utils_loader
                 .destroy_debug_utils_messenger(self.debug_call_back, None);
             self.instance.destroy_instance(None);
-
-            
         }
     }
 }

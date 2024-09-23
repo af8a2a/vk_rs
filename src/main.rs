@@ -356,21 +356,6 @@ impl VulkanApp {
                 .bind_image_memory(depth_image, depth_image_memory, 0)
                 .expect("Unable to bind depth image memory");
 
-            let depth_image_view_info = vk::ImageViewCreateInfo::default()
-                .subresource_range(
-                    vk::ImageSubresourceRange::default()
-                        .aspect_mask(vk::ImageAspectFlags::DEPTH)
-                        .level_count(1)
-                        .layer_count(1),
-                )
-                .image(depth_image)
-                .format(depth_image_create_info.format)
-                .view_type(vk::ImageViewType::TYPE_2D);
-
-            let depth_image_view = device
-                .create_image_view(&depth_image_view_info, None)
-                .unwrap();
-
             let pool_create_info = vk::CommandPoolCreateInfo::default()
                 .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
                 .queue_family_index(queue_family_index);
@@ -406,6 +391,57 @@ impl VulkanApp {
             let setup_commands_reuse_fence = device
                 .create_fence(&fence_create_info, None)
                 .expect("Create fence failed.");
+
+            record_submit_commandbuffer(
+                &device,
+                setup_command_buffer,
+                setup_commands_reuse_fence,
+                present_queue,
+                &[],
+                &[],
+                &[],
+                |device, setup_command_buffer| {
+                    let layout_transition_barriers = vk::ImageMemoryBarrier::default()
+                        .image(depth_image)
+                        .dst_access_mask(
+                            vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ
+                                | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                        )
+                        .new_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+                        .old_layout(vk::ImageLayout::UNDEFINED)
+                        .subresource_range(
+                            vk::ImageSubresourceRange::default()
+                                .aspect_mask(vk::ImageAspectFlags::DEPTH)
+                                .layer_count(1)
+                                .level_count(1),
+                        );
+
+                    device.cmd_pipeline_barrier(
+                        setup_command_buffer,
+                        vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                        vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
+                        vk::DependencyFlags::empty(),
+                        &[],
+                        &[],
+                        &[layout_transition_barriers],
+                    );
+                },
+            );
+
+            let depth_image_view_info = vk::ImageViewCreateInfo::default()
+                .subresource_range(
+                    vk::ImageSubresourceRange::default()
+                        .aspect_mask(vk::ImageAspectFlags::DEPTH)
+                        .level_count(1)
+                        .layer_count(1),
+                )
+                .image(depth_image)
+                .format(depth_image_create_info.format)
+                .view_type(vk::ImageViewType::TYPE_2D);
+
+            let depth_image_view = device
+                .create_image_view(&depth_image_view_info, None)
+                .unwrap();
 
             Self {
                 entry,

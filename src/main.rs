@@ -53,8 +53,13 @@ pub struct VulkanApp {
     //device & queue
     pub pdevice: vk::PhysicalDevice,
     pub present_queue: vk::Queue,
-
     pub queue_family_index: u32,
+
+    //cmd buffer
+    pub pool: vk::CommandPool,
+    pub draw_command_buffer: vk::CommandBuffer,
+    pub setup_command_buffer: vk::CommandBuffer,
+
 }
 
 impl VulkanApp {
@@ -305,6 +310,23 @@ impl VulkanApp {
                 .create_image_view(&depth_image_view_info, None)
                 .unwrap();
 
+            let pool_create_info = vk::CommandPoolCreateInfo::default()
+                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+                .queue_family_index(queue_family_index);
+
+            let pool = device.create_command_pool(&pool_create_info, None).unwrap();
+
+            let command_buffer_allocate_info = vk::CommandBufferAllocateInfo::default()
+                .command_buffer_count(2)
+                .command_pool(pool)
+                .level(vk::CommandBufferLevel::PRIMARY);
+
+            let command_buffers = device
+                .allocate_command_buffers(&command_buffer_allocate_info)
+                .unwrap();
+            let setup_command_buffer = command_buffers[0];
+            let draw_command_buffer = command_buffers[1];
+
             Self {
                 entry,
                 instance,
@@ -325,6 +347,9 @@ impl VulkanApp {
                 depth_image,
                 depth_image_view,
                 depth_image_memory,
+                pool,
+                setup_command_buffer,
+                draw_command_buffer,
             }
         }
     }
@@ -340,13 +365,11 @@ impl Drop for VulkanApp {
             for &image_view in self.present_image_views.iter() {
                 self.device.destroy_image_view(image_view, None);
             }
-            for &image in self.present_images.iter() {
-                self.device.destroy_image(image, None);
-            }
 
             self.swapchain_loader
                 .destroy_swapchain(self.swapchain, None);
-
+            self.device.destroy_command_pool(self.pool, None);
+            
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
             self.debug_utils_loader

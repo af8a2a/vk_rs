@@ -24,7 +24,6 @@ pub fn find_memorytype_index(
         .map(|(index, _memory_type)| index as _)
 }
 
-
 /// Helper function for submitting command buffers. Immediately waits for the fence before the command buffer
 /// is executed. That way we can delay the waiting for the fences by 1 frame which is good for performance.
 /// Make sure to create the fence in a signaled state on the first use.
@@ -80,7 +79,6 @@ pub fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
     }
 }
 
-
 pub struct VulkanApp {
     pub entry: Entry,
     pub instance: ash::Instance,
@@ -117,6 +115,12 @@ pub struct VulkanApp {
     pub draw_command_buffer: vk::CommandBuffer,
     pub setup_command_buffer: vk::CommandBuffer,
 
+    //fence and semaphore
+    pub present_complete_semaphore: vk::Semaphore,
+    pub rendering_complete_semaphore: vk::Semaphore,
+
+    pub draw_commands_reuse_fence: vk::Fence,
+    pub setup_commands_reuse_fence: vk::Fence,
 }
 
 impl VulkanApp {
@@ -384,8 +388,25 @@ impl VulkanApp {
             let setup_command_buffer = command_buffers[0];
             let draw_command_buffer = command_buffers[1];
 
+            let semaphore_create_info = vk::SemaphoreCreateInfo::default();
 
-            
+            let present_complete_semaphore = device
+                .create_semaphore(&semaphore_create_info, None)
+                .unwrap();
+            let rendering_complete_semaphore = device
+                .create_semaphore(&semaphore_create_info, None)
+                .unwrap();
+
+            let fence_create_info =
+                vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
+
+            let draw_commands_reuse_fence = device
+                .create_fence(&fence_create_info, None)
+                .expect("Create fence failed.");
+            let setup_commands_reuse_fence = device
+                .create_fence(&fence_create_info, None)
+                .expect("Create fence failed.");
+
             Self {
                 entry,
                 instance,
@@ -409,6 +430,10 @@ impl VulkanApp {
                 pool,
                 setup_command_buffer,
                 draw_command_buffer,
+                draw_commands_reuse_fence,
+                setup_commands_reuse_fence,
+                present_complete_semaphore,
+                rendering_complete_semaphore,
             }
         }
     }
@@ -417,6 +442,16 @@ impl VulkanApp {
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
+            self.device.device_wait_idle().unwrap();
+            self.device
+                .destroy_semaphore(self.present_complete_semaphore, None);
+            self.device
+                .destroy_semaphore(self.rendering_complete_semaphore, None);
+            self.device
+                .destroy_fence(self.draw_commands_reuse_fence, None);
+            self.device
+                .destroy_fence(self.setup_commands_reuse_fence, None);
+
             self.device.free_memory(self.depth_image_memory, None);
             self.device.destroy_image_view(self.depth_image_view, None);
             self.device.destroy_image(self.depth_image, None);

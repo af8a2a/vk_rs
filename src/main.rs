@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::ffi::{self, c_char};
+use std::io::Cursor;
 
 use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
-use ash::util::Align;
+use ash::util::{read_spv, Align};
 use ash::{vk, Entry};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -668,7 +669,18 @@ impl VulkanApp {
                 .bind_buffer_memory(vertex_input_buffer, vertex_input_buffer_memory, 0)
                 .unwrap();
 
-            
+            let mut vertex_spv_file =
+                Cursor::new(&include_bytes!("../shader/triangle/triangle.vert.spv")[..]);
+            let mut frag_spv_file =
+                Cursor::new(&include_bytes!("../shader/triangle/triangle.frag.spv")[..]);
+
+            let vertex_code =
+                read_spv(&mut vertex_spv_file).expect("Failed to read vertex shader spv file");
+            let vertex_shader_info = vk::ShaderModuleCreateInfo::default().code(&vertex_code);
+
+            let frag_code =
+                read_spv(&mut frag_spv_file).expect("Failed to read fragment shader spv file");
+            let frag_shader_info = vk::ShaderModuleCreateInfo::default().code(&frag_code);
         }
     }
 }

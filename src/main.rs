@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ffi::{self, c_char};
 use std::io::Cursor;
 use std::mem::offset_of;
+use std::sync::Arc;
 
 use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
@@ -90,7 +91,7 @@ struct Vertex {
 pub struct VulkanApp {
     pub entry: Entry,
     pub instance: ash::Instance,
-    pub device: ash::Device,
+    pub device: Arc<ash::Device>,
     //loader
     pub surface_loader: surface::Instance,
     pub debug_utils_loader: debug_utils::Instance,
@@ -244,9 +245,11 @@ impl VulkanApp {
                 .enabled_extension_names(&device_extension_names_raw)
                 .enabled_features(&features);
 
-            let device = instance
-                .create_device(pdevice, &device_create_info, None)
-                .unwrap();
+            let device = Arc::new(
+                instance
+                    .create_device(pdevice, &device_create_info, None)
+                    .unwrap(),
+            );
 
             let present_queue = device.get_device_queue(queue_family_index, 0);
 
@@ -486,7 +489,7 @@ impl VulkanApp {
 }
 
 impl VulkanApp {
-    pub fn render_loop(&mut self) {
+    pub fn render_loop(&self) -> (Box<dyn Fn() -> ()>, RenderState) {
         unsafe {
             let renderpass_attachments = [
                 vk::AttachmentDescription {
@@ -756,7 +759,7 @@ impl VulkanApp {
             let viewport_state_info = vk::PipelineViewportStateCreateInfo::default()
                 .scissors(&scissors)
                 .viewports(&viewports);
-    
+
             let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
                 front_face: vk::FrontFace::COUNTER_CLOCKWISE,
                 line_width: 1.0,
@@ -797,11 +800,11 @@ impl VulkanApp {
             let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
                 .logic_op(vk::LogicOp::CLEAR)
                 .attachments(&color_blend_attachment_states);
-    
+
             let dynamic_state = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
             let dynamic_state_info =
                 vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_state);
-    
+
             let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo::default()
                 .stages(&shader_stage_create_infos)
                 .vertex_input_state(&vertex_input_state_info)
@@ -814,17 +817,148 @@ impl VulkanApp {
                 .dynamic_state(&dynamic_state_info)
                 .layout(pipeline_layout)
                 .render_pass(renderpass);
-    
+
             let graphics_pipelines = self
                 .device
-                .create_graphics_pipelines(vk::PipelineCache::null(), &[graphic_pipeline_info], None)
+                .create_graphics_pipelines(
+                    vk::PipelineCache::null(),
+                    &[graphic_pipeline_info],
+                    None,
+                )
                 .expect("Unable to create graphics pipeline");
-    
+
             let graphic_pipeline = graphics_pipelines[0];
-    
-    
+
+            let state = RenderState {
+                device: self.device.clone(),
+                graphics_pipelines,
+                pipeline_layout,
+                vertex_shader_module,
+                fragment_shader_module,
+                index_buffer_memory,
+                index_buffer,
+                vertex_input_buffer_memory,
+                vertex_input_buffer,
+                framebuffers: framebuffers.clone(),
+                renderpass,
+            };
+
+            let device = self.device.clone();
+            let fences = [self.draw_commands_reuse_fence.clone()];
+            let swapchain_loader = self.swapchain_loader.clone();
+            let swapchain = self.swapchain.clone();
+            let present_complete_semaphore = self.present_complete_semaphore.clone();
+            let surface_resolution = self.surface_resolution.clone();
+            let draw_command_buffer = self.draw_command_buffer.clone();
+            let draw_commands_reuse_fence = self.draw_commands_reuse_fence.clone();
+            let present_queue = self.present_queue.clone();
+            let rendering_complete_semaphore = self.rendering_complete_semaphore.clone();
+            let render_loop = move || {
+                device.wait_for_fences(&fences, true, u64::MAX).unwrap();
+                let (present_index, _) = swapchain_loader
+                    .acquire_next_image(
+                        swapchain,
+                        u64::MAX,
+                        present_complete_semaphore,
+                        vk::Fence::null(),
+                    )
+                    .unwrap();
+                let clear_values = [
+                    vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [0.0, 0.0, 0.0, 0.0],
+                        },
+                    },
+                    vk::ClearValue {
+                        depth_stencil: vk::ClearDepthStencilValue {
+                            depth: 1.0,
+                            stencil: 0,
+                        },
+                    },
+                ];
+                let render_pass_begin_info = vk::RenderPassBeginInfo::default()
+                    .render_pass(renderpass)
+                    .framebuffer(framebuffers[present_index as usize])
+                    .render_area(surface_resolution.into())
+                    .clear_values(&clear_values);
+
+                record_submit_commandbuffer(
+                    &device,
+                    draw_command_buffer,
+                    draw_commands_reuse_fence,
+                    present_queue,
+                    &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT],
+                    &[present_complete_semaphore],
+                    &[rendering_complete_semaphore],
+                    |device, draw_command_buffer| {
+                        device.cmd_begin_render_pass(
+                            draw_command_buffer,
+                            &render_pass_begin_info,
+                            vk::SubpassContents::INLINE,
+                        );
+                        device.cmd_bind_pipeline(
+                            draw_command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            graphic_pipeline,
+                        );
+                        device.cmd_set_viewport(draw_command_buffer, 0, &viewports);
+                        device.cmd_set_scissor(draw_command_buffer, 0, &scissors);
+                        device.cmd_bind_vertex_buffers(
+                            draw_command_buffer,
+                            0,
+                            &[vertex_input_buffer],
+                            &[0],
+                        );
+                        device.cmd_bind_index_buffer(
+                            draw_command_buffer,
+                            index_buffer,
+                            0,
+                            vk::IndexType::UINT32,
+                        );
+                        device.cmd_draw_indexed(
+                            draw_command_buffer,
+                            index_buffer_data.len() as u32,
+                            1,
+                            0,
+                            0,
+                            1,
+                        );
+                        // Or draw without the index buffer
+                        // device.cmd_draw(draw_command_buffer, 3, 1, 0, 0);
+                        device.cmd_end_render_pass(draw_command_buffer);
+                    },
+                );
+
+                let wait_semaphors = [rendering_complete_semaphore];
+                let swapchains = [swapchain];
+                let image_indices = [present_index];
+                let present_info = vk::PresentInfoKHR::default()
+                    .wait_semaphores(&wait_semaphors) // &self.rendering_complete_semaphore)
+                    .swapchains(&swapchains)
+                    .image_indices(&image_indices);
+
+                swapchain_loader
+                    .queue_present(present_queue, &present_info)
+                    .unwrap();
+            };
+
+            (Box::new(render_loop), state)
         }
     }
+}
+
+pub struct RenderState {
+    device: Arc<ash::Device>,
+    graphics_pipelines: Vec<vk::Pipeline>,
+    pipeline_layout: vk::PipelineLayout,
+    vertex_shader_module: vk::ShaderModule,
+    fragment_shader_module: vk::ShaderModule,
+    index_buffer_memory: vk::DeviceMemory,
+    index_buffer: vk::Buffer,
+    vertex_input_buffer_memory: vk::DeviceMemory,
+    vertex_input_buffer: vk::Buffer,
+    framebuffers: Vec<vk::Framebuffer>,
+    renderpass: vk::RenderPass,
 }
 
 impl Drop for VulkanApp {
@@ -892,6 +1026,8 @@ unsafe extern "system" fn vulkan_debug_callback(
 struct App {
     window: Option<Window>,
     vk: Option<VulkanApp>,
+    state: Option<RenderState>,
+    render_loop: Option<Box<dyn Fn() -> ()>>,
 }
 
 impl ApplicationHandler for App {
@@ -902,6 +1038,9 @@ impl ApplicationHandler for App {
                 .unwrap(),
         );
         self.vk = Some(VulkanApp::new(self.window.as_ref().unwrap()));
+        let (render_loop, state) = self.vk.as_ref().unwrap().render_loop();
+        self.state=Some(state);
+        self.render_loop = Some(render_loop);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -913,10 +1052,11 @@ impl ApplicationHandler for App {
 
             WindowEvent::RedrawRequested => {
                 if self.vk.is_some() {
-                    println!("create vulkan instance!");
+                    let render_fn=self.render_loop.as_ref().unwrap();
+                    (render_fn)();
                 }
                 self.window.as_ref().unwrap().request_redraw();
-            }
+            }  
             _ => (),
         }
     }

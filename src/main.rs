@@ -960,7 +960,29 @@ pub struct RenderState {
     framebuffers: Vec<vk::Framebuffer>,
     renderpass: vk::RenderPass,
 }
-
+impl Drop for RenderState {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.device_wait_idle().unwrap();
+            for &pipeline in self.graphics_pipelines.iter() {
+                self.device.destroy_pipeline(pipeline, None);
+            }
+            self.device.destroy_pipeline_layout(self.pipeline_layout, None);
+            self.device
+                .destroy_shader_module(self.vertex_shader_module, None);
+            self.device
+                .destroy_shader_module(self.fragment_shader_module, None);
+            self.device.free_memory(self.index_buffer_memory, None);
+            self.device.destroy_buffer(self.index_buffer, None);
+            self.device.free_memory(self.vertex_input_buffer_memory, None);
+            self.device.destroy_buffer(self.vertex_input_buffer, None);
+            for &framebuffer in self.framebuffers.iter() {
+                self.device.destroy_framebuffer(framebuffer, None);
+            }
+            self.device.destroy_render_pass(self.renderpass, None);
+        }
+    }
+}
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
@@ -1039,7 +1061,7 @@ impl ApplicationHandler for App {
         );
         self.vk = Some(VulkanApp::new(self.window.as_ref().unwrap()));
         let (render_loop, state) = self.vk.as_ref().unwrap().render_loop();
-        self.state=Some(state);
+        self.state = Some(state);
         self.render_loop = Some(render_loop);
     }
 
@@ -1052,16 +1074,29 @@ impl ApplicationHandler for App {
 
             WindowEvent::RedrawRequested => {
                 if self.vk.is_some() {
-                    let render_fn=self.render_loop.as_ref().unwrap();
+                    let render_fn = self.render_loop.as_ref().unwrap();
                     (render_fn)();
                 }
                 self.window.as_ref().unwrap().request_redraw();
-            }  
+            }
             _ => (),
         }
     }
 }
+impl Drop for App{
+    fn drop(&mut self) {
+        drop(self.window.as_mut());
+        self.window = None;
+        drop(self.render_loop.as_mut());
+        self.render_loop = None;
+        drop(self.state.as_mut());
+        self.state = None;
+        self.vk = None;
+        drop(self.vk.as_mut());
 
+
+    }
+}
 fn main() {
     let event_loop = EventLoop::new().unwrap();
 

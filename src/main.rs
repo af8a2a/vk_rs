@@ -412,6 +412,7 @@ impl VulkanApp {
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
+            self.device.device_wait_idle().expect("Device lost!");
             for i in 0..MAX_FRAMES_IN_FLIGHT {
                 self.device
                     .destroy_semaphore(self.image_available_semaphores[i], None);
@@ -419,6 +420,8 @@ impl Drop for VulkanApp {
                     .destroy_semaphore(self.render_finished_semaphores[i], None);
                 self.device.destroy_fence(self.in_flight_fences[i], None);
             }
+            self.device.destroy_buffer(self.vertex_buffer, None);
+            self.device.free_memory(self.vertex_buffer_memory, None);
 
             self.cleanup_swapchain();
 
@@ -429,7 +432,6 @@ impl Drop for VulkanApp {
 
             self.debug_utils_loader
                 .destroy_debug_utils_messenger(self.debug_merssager, None);
-
             self.instance.destroy_instance(None);
         }
     }

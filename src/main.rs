@@ -4,6 +4,7 @@ use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
 use ash::{vk, Entry};
 use vk_rs::structures::{QueueFamilyIndices, SurfaceStuff, Vertex, VERTICES_DATA};
+use vk_rs::util::buffer::{copy_buffer, create_buffer};
 use vk_rs::util::command_buffer::{create_command_buffers, create_command_pool};
 use vk_rs::util::debug::setup_debug_utils;
 use vk_rs::util::device::{create_logical_device, pick_physical_device};
@@ -130,9 +131,13 @@ impl VulkanApp {
                 swapchain_stuff.swapchain_extent,
             );
             let command_pool = create_command_pool(&device, &queue_family);
-            let (vertex_buffer, vertex_buffer_memory) =
-                VulkanApp::create_vertex_buffer(&instance, &device, physical_device);
-
+            let (vertex_buffer, vertex_buffer_memory) = VulkanApp::create_vertex_buffer(
+                &instance,
+                &device,
+                physical_device,
+                command_pool,
+                graphics_queue,
+            );
             let command_buffers = create_command_buffers(
                 &device,
                 command_pool,
@@ -181,7 +186,7 @@ impl VulkanApp {
 
                 is_framebuffer_resized: false,
                 window,
-                
+
                 vertex_buffer,
                 vertex_buffer_memory,
             }
@@ -352,57 +357,56 @@ impl VulkanApp {
         instance: &ash::Instance,
         device: &ash::Device,
         physical_device: vk::PhysicalDevice,
+        command_pool: vk::CommandPool,
+        submit_queue: vk::Queue,
     ) -> (vk::Buffer, vk::DeviceMemory) {
-        let vertex_buffer_create_info = vk::BufferCreateInfo::default()
-            .size(std::mem::size_of_val(&VERTICES_DATA) as u64)
-            .usage(vk::BufferUsageFlags::VERTEX_BUFFER)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-
-        let vertex_buffer = unsafe {
-            device
-                .create_buffer(&vertex_buffer_create_info, None)
-                .expect("Failed to create Vertex Buffer")
-        };
-
-        let mem_requirements = unsafe { device.get_buffer_memory_requirements(vertex_buffer) };
-        let mem_properties =
+        let buffer_size = std::mem::size_of_val(&VERTICES_DATA) as vk::DeviceSize;
+        let device_memory_properties =
             unsafe { instance.get_physical_device_memory_properties(physical_device) };
-        let required_memory_flags: vk::MemoryPropertyFlags =
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
-        let find_memory_type = find_memory_type(
-            mem_requirements.memory_type_bits,
-            required_memory_flags,
-            mem_properties,
+
+        let (staging_buffer, staging_buffer_memory) = create_buffer(
+            device,
+            buffer_size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+            &device_memory_properties,
         );
-        let memory_type = find_memory_type;
-
-        let allocate_info = vk::MemoryAllocateInfo::default()
-            .allocation_size(mem_requirements.size)
-            .memory_type_index(memory_type);
-
-        let vertex_buffer_memory = unsafe {
-            device
-                .allocate_memory(&allocate_info, None)
-                .expect("Failed to allocate vertex buffer memory!")
-        };
 
         unsafe {
-            device
-                .bind_buffer_memory(vertex_buffer, vertex_buffer_memory, 0)
-                .expect("Failed to bind Buffer");
-
             let data_ptr = device
                 .map_memory(
-                    vertex_buffer_memory,
+                    staging_buffer_memory,
                     0,
-                    vertex_buffer_create_info.size,
+                    buffer_size,
                     vk::MemoryMapFlags::empty(),
                 )
                 .expect("Failed to Map Memory") as *mut Vertex;
 
             data_ptr.copy_from_nonoverlapping(VERTICES_DATA.as_ptr(), VERTICES_DATA.len());
 
-            device.unmap_memory(vertex_buffer_memory);
+            device.unmap_memory(staging_buffer_memory);
+        }
+
+        let (vertex_buffer, vertex_buffer_memory) = create_buffer(
+            device,
+            buffer_size,
+            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            &device_memory_properties,
+        );
+
+        copy_buffer(
+            device,
+            submit_queue,
+            command_pool,
+            staging_buffer,
+            vertex_buffer,
+            buffer_size,
+        );
+
+        unsafe {
+            device.destroy_buffer(staging_buffer, None);
+            device.free_memory(staging_buffer_memory, None);
         }
 
         (vertex_buffer, vertex_buffer_memory)

@@ -8,6 +8,7 @@ pub mod sync;
 pub mod instance;
 pub mod framebuffer;
 pub mod surface;
+pub mod buffer;
 use std::ffi::{self, c_char, CStr};
 
 use ash::{
@@ -93,7 +94,7 @@ pub fn vk_ptr_to_string(raw_string_array: *const i8) -> String {
 pub fn find_memory_type(
     type_filter: u32,
     required_properties: vk::MemoryPropertyFlags,
-    mem_properties: vk::PhysicalDeviceMemoryProperties,
+    mem_properties: &vk::PhysicalDeviceMemoryProperties,
 ) -> u32 {
     for (i, memory_type) in mem_properties.memory_types.iter().enumerate() {
         //if (type_filter & (1 << i)) > 0 && (memory_type.property_flags & required_properties) == required_properties {

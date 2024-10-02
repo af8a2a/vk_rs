@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::structures::QueueFamilyIndices;
+use crate::structures::{QueueFamilyIndices, INDICES_DATA};
 
 
 /// Helper function for submitting command buffers. Immediately waits for the fence before the command buffer
@@ -78,6 +78,7 @@ pub fn create_command_buffers(
     render_pass: vk::RenderPass,
     surface_extent: vk::Extent2D,
     vertex_buffer: vk::Buffer,
+    index_buffer: vk::Buffer,
 ) -> Vec<vk::CommandBuffer> {
     let command_buffer_allocate_info = vk::CommandBufferAllocateInfo::default()
         .command_pool(command_pool)
@@ -129,8 +130,14 @@ pub fn create_command_buffers(
             let vertex_buffers = [vertex_buffer];
             let offsets = [0_u64];
             device.cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
+            device.cmd_bind_index_buffer(
+                command_buffer,
+                index_buffer,
+                0,
+                vk::IndexType::UINT32,
+            );
 
-            device.cmd_draw(command_buffer, 3, 1, 0, 0);
+            device.cmd_draw_indexed(command_buffer, INDICES_DATA.len() as u32, 1, 0, 0, 0);
 
             device.cmd_end_render_pass(command_buffer);
 

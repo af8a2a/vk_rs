@@ -35,20 +35,25 @@ impl Vertex {
     }
 }
 
-pub const VERTICES_DATA: [Vertex; 3] = [
+pub const VERTICES_DATA: [Vertex; 4] = [
     Vertex {
-        pos: [0.0, -0.5],
+        pos: [-0.5, -0.5],
         color: [1.0, 0.0, 0.0],
     },
     Vertex {
-        pos: [0.5, 0.5],
+        pos: [0.5, -0.5],
         color: [0.0, 1.0, 0.0],
     },
     Vertex {
-        pos: [-0.5, 0.5],
+        pos: [0.5, 0.5],
         color: [0.0, 0.0, 1.0],
     },
+    Vertex {
+        pos: [-0.5, 0.5],
+        color: [1.0, 1.0, 1.0],
+    },
 ];
+pub const INDICES_DATA: [u32; 6] = [0, 1, 2, 2, 3, 0];
 
 pub struct SyncObjects {
     pub image_available_semaphores: Vec<vk::Semaphore>,

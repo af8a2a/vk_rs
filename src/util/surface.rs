@@ -12,7 +12,7 @@ pub fn create_surface(
     let surface = unsafe {
         ash_window::create_surface(
             &entry,
-            &instance,
+            instance,
             window.display_handle().unwrap().as_raw(),
             window.window_handle().unwrap().as_raw(),
             None,

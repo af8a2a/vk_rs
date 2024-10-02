@@ -1,4 +1,4 @@
-use std::{ffi::CString, io::Cursor, mem::offset_of};
+use std::{ffi::CString, io::Cursor};
 
 use ash::{
     util::read_spv,

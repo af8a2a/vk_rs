@@ -15,7 +15,6 @@ use vk_rs::util::pipeline::{create_graphics_pipeline, create_render_pass};
 use vk_rs::util::surface::create_surface;
 use vk_rs::util::swapchain::create_swapchain;
 use vk_rs::util::sync::create_sync_objects;
-use vk_rs::util::{find_memory_type, vk_to_string};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -200,14 +199,14 @@ impl VulkanApp {
 
         unsafe {
             self.device
-                .wait_for_fences(&wait_fences, true, std::u64::MAX)
+                .wait_for_fences(&wait_fences, true, u64::MAX)
                 .expect("Failed to wait for Fence!");
         }
 
         let (image_index, _is_sub_optimal) = unsafe {
             let result = self.swapchain_loader.acquire_next_image(
                 self.swapchain,
-                std::u64::MAX,
+                u64::MAX,
                 self.image_available_semaphores[self.current_frame],
                 vk::Fence::null(),
             );
@@ -458,7 +457,7 @@ impl ApplicationHandler for App {
         self.window = Some(window);
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // println!("extend2d:{:#?}", self.vk.as_ref().unwrap().surface_resolution);
 
         match event {
@@ -476,14 +475,8 @@ impl ApplicationHandler for App {
         }
     }
 }
-impl Drop for App {
-    fn drop(&mut self) {
-        drop(self.window.as_mut());
-        self.window = None;
-        self.vk = None;
-        drop(self.vk.as_mut());
-    }
-}
+
+
 fn main() {
     let event_loop = EventLoop::new().unwrap();
 

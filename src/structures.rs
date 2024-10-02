@@ -2,15 +2,14 @@ use std::mem::offset_of;
 
 use ash::vk;
 
-
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
-   pub pos: [f32; 2],
-   pub color: [f32; 3],
-} 
+    pub pos: [f32; 2],
+    pub color: [f32; 3],
+}
 impl Vertex {
-   pub fn get_binding_descriptions() -> [vk::VertexInputBindingDescription; 1] {
+    pub fn get_binding_descriptions() -> [vk::VertexInputBindingDescription; 1] {
         [vk::VertexInputBindingDescription {
             binding: 0,
             stride: std::mem::size_of::<Self>() as u32,
@@ -51,7 +50,6 @@ pub const VERTICES_DATA: [Vertex; 3] = [
     },
 ];
 
-
 pub struct SyncObjects {
     pub image_available_semaphores: Vec<vk::Semaphore>,
     pub render_finished_semaphores: Vec<vk::Semaphore>,
@@ -64,8 +62,6 @@ pub struct SwapChainStuff {
     pub swapchain_format: vk::Format,
     pub swapchain_extent: vk::Extent2D,
 }
-
-
 pub struct SurfaceStuff {
     pub surface_loader: ash::khr::surface::Instance,
     pub surface: vk::SurfaceKHR,
@@ -73,7 +69,7 @@ pub struct SurfaceStuff {
     pub screen_width: u32,
     pub screen_height: u32,
 }
-
+#[derive(Default)]
 pub struct QueueFamilyIndices {
     pub graphics_family: Option<u32>,
     pub present_family: Option<u32>,
@@ -92,11 +88,8 @@ impl QueueFamilyIndices {
     }
 }
 
-
-
 pub struct SwapChainSupportDetail {
     pub capabilities: vk::SurfaceCapabilitiesKHR,
     pub formats: Vec<vk::SurfaceFormatKHR>,
     pub present_modes: Vec<vk::PresentModeKHR>,
 }
-

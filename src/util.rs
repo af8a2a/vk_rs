@@ -9,20 +9,10 @@ pub mod instance;
 pub mod framebuffer;
 pub mod surface;
 pub mod buffer;
-use std::ffi::{self, c_char, CStr};
+use std::ffi::{c_char, CStr};
 
-use ash::{
-    ext::debug_utils,
-    util::read_spv,
-    vk::{self, DebugUtilsMessengerEXT, PipelineLayoutCreateInfo},
-};
-use swapchain::query_swapchain_support;
-use winit::{
-    raw_window_handle::{HasDisplayHandle, HasWindowHandle},
-    window::Window,
-};
+use ash::vk::{self};
 
-use crate::structures::{QueueFamilyIndices, SurfaceStuff, SwapChainSupportDetail, SyncObjects};
 
 
 

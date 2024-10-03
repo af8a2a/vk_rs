@@ -8,6 +8,7 @@ use nalgebra_glm::Mat4x4;
 pub struct Vertex {
     pub pos: [f32; 2],
     pub color: [f32; 3],
+    pub tex_coord: [f32; 2],
 }
 impl Vertex {
     pub fn get_binding_descriptions() -> [vk::VertexInputBindingDescription; 1] {
@@ -18,7 +19,7 @@ impl Vertex {
         }]
     }
 
-    pub fn get_attribute_descriptions() -> [vk::VertexInputAttributeDescription; 2] {
+    pub fn get_attribute_descriptions() -> [vk::VertexInputAttributeDescription; 3] {
         [
             vk::VertexInputAttributeDescription {
                 location: 0,
@@ -32,39 +33,47 @@ impl Vertex {
                 format: vk::Format::R32G32B32_SFLOAT,
                 offset: offset_of!(Self, color) as u32,
             },
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 2,
+                format: vk::Format::R32G32_SFLOAT,
+                offset: offset_of!(Vertex, tex_coord) as u32,
+            },
         ]
     }
 }
 
 pub const VERTICES_DATA: [Vertex; 4] = [
     Vertex {
-        pos: [-0.5, -0.5],
+        pos: [-0.75, -0.75],
         color: [1.0, 0.0, 0.0],
+        tex_coord: [1.0, 0.0],
     },
     Vertex {
-        pos: [0.5, -0.5],
+        pos: [0.75, -0.75],
         color: [0.0, 1.0, 0.0],
+        tex_coord: [0.0, 0.0],
     },
     Vertex {
-        pos: [0.5, 0.5],
+        pos: [0.75, 0.75],
         color: [0.0, 0.0, 1.0],
+        tex_coord: [0.0, 1.0],
     },
     Vertex {
-        pos: [-0.5, 0.5],
+        pos: [-0.75, 0.75],
         color: [1.0, 1.0, 1.0],
+        tex_coord: [1.0, 1.0],
     },
 ];
 pub const INDICES_DATA: [u32; 6] = [0, 1, 2, 2, 3, 0];
 
-
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct UniformBufferObject {
-   pub model: Mat4x4,
-   pub view: Mat4x4,
-   pub proj: Mat4x4,
+    pub model: Mat4x4,
+    pub view: Mat4x4,
+    pub proj: Mat4x4,
 }
-
 
 pub struct SyncObjects {
     pub image_available_semaphores: Vec<vk::Semaphore>,

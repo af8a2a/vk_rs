@@ -1,16 +1,17 @@
+pub mod buffer;
 pub mod command_buffer;
 pub mod debug;
+pub mod descriptor;
 pub mod device;
+pub mod fps_limiter;
+pub mod framebuffer;
 pub mod image;
+pub mod instance;
 pub mod pipeline;
+pub mod surface;
 pub mod swapchain;
 pub mod sync;
-pub mod instance;
-pub mod framebuffer;
-pub mod surface;
-pub mod buffer;
-pub mod descriptor;
-pub mod fps_limiter;
+pub mod sampler;
 
 use std::ffi::{c_char, CStr};
 
@@ -79,8 +80,6 @@ pub fn vk_ptr_to_string(raw_string_array: *const i8) -> String {
         .to_owned()
 }
 
-
-
 pub fn find_memory_type(
     type_filter: u32,
     required_properties: vk::MemoryPropertyFlags,
@@ -92,8 +91,7 @@ pub fn find_memory_type(
         // }
 
         // same implementation
-        if (type_filter & (1 << i)) > 0
-            && memory_type.property_flags.contains(required_properties)
+        if (type_filter & (1 << i)) > 0 && memory_type.property_flags.contains(required_properties)
         {
             return i as u32;
         }
@@ -101,3 +99,4 @@ pub fn find_memory_type(
 
     panic!("Failed to find suitable memory type!")
 }
+

@@ -2,7 +2,6 @@ use ash::vk;
 
 use crate::structures::{QueueFamilyIndices, INDICES_DATA};
 
-
 /// Helper function for submitting command buffers. Immediately waits for the fence before the command buffer
 /// is executed. That way we can delay the waiting for the fences by 1 frame which is good for performance.
 /// Make sure to create the fence in a signaled state on the first use.
@@ -134,12 +133,7 @@ pub fn create_command_buffers(
             let descriptor_sets_to_bind = [descriptor_sets[i]];
 
             device.cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
-            device.cmd_bind_index_buffer(
-                command_buffer,
-                index_buffer,
-                0,
-                vk::IndexType::UINT32,
-            );
+            device.cmd_bind_index_buffer(command_buffer, index_buffer, 0, vk::IndexType::UINT32);
             device.cmd_bind_descriptor_sets(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
@@ -162,4 +156,65 @@ pub fn create_command_buffers(
     command_buffers
 }
 
+pub fn record_single_time_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
+    device: &ash::Device,
+    command_pool: vk::CommandPool,
+    submit_queue: vk::Queue,
+    f: F,
+) {
+    let command_buffer = begin_single_time_command(device, command_pool);
+    f(device, command_buffer);
+    end_single_time_command(device, command_pool, submit_queue, command_buffer);
+}
 
+fn begin_single_time_command(
+    device: &ash::Device,
+    command_pool: vk::CommandPool,
+) -> vk::CommandBuffer {
+    let command_buffer_allocate_info = vk::CommandBufferAllocateInfo::default()
+        .command_pool(command_pool)
+        .command_buffer_count(1)
+        .level(vk::CommandBufferLevel::PRIMARY);
+    let command_buffer = unsafe {
+        device
+            .allocate_command_buffers(&command_buffer_allocate_info)
+            .expect("Failed to allocate Command Buffers!")
+    }[0];
+
+    let command_buffer_begin_info =
+        vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+    unsafe {
+        device
+            .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+            .expect("Failed to begin recording Command Buffer at beginning!");
+    }
+
+    command_buffer
+}
+
+fn end_single_time_command(
+    device: &ash::Device,
+    command_pool: vk::CommandPool,
+    submit_queue: vk::Queue,
+    command_buffer: vk::CommandBuffer,
+) {
+    unsafe {
+        device
+            .end_command_buffer(command_buffer)
+            .expect("Failed to record Command Buffer at Ending!");
+    }
+
+    let buffers_to_submit = [command_buffer];
+
+    let submit_infos = [vk::SubmitInfo::default().command_buffers(&buffers_to_submit)];
+
+    unsafe {
+        device
+            .queue_submit(submit_queue, &submit_infos, vk::Fence::null())
+            .expect("Failed to Queue Submit!");
+        device
+            .queue_wait_idle(submit_queue)
+            .expect("Failed to wait Queue idle!");
+        device.free_command_buffers(command_pool, &buffers_to_submit);
+    }
+}

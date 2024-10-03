@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use ash::ext::debug_utils;
@@ -17,9 +18,10 @@ use vk_rs::util::descriptor::{
 use vk_rs::util::device::{create_logical_device, pick_physical_device};
 use vk_rs::util::fps_limiter::FPSLimiter;
 use vk_rs::util::framebuffer::create_framebuffers;
-use vk_rs::util::image::create_image_views;
+use vk_rs::util::image::{create_image_view, create_image_views, create_texture_image};
 use vk_rs::util::instance::create_instance;
 use vk_rs::util::pipeline::{create_graphics_pipeline, create_render_pass};
+use vk_rs::util::sampler::create_texture_sampler;
 use vk_rs::util::surface::create_surface;
 use vk_rs::util::swapchain::create_swapchain;
 use vk_rs::util::sync::create_sync_objects;
@@ -27,22 +29,9 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
-pub fn find_memorytype_index(
-    memory_req: &vk::MemoryRequirements,
-    memory_prop: &vk::PhysicalDeviceMemoryProperties,
-    flags: vk::MemoryPropertyFlags,
-) -> Option<u32> {
-    memory_prop.memory_types[..memory_prop.memory_type_count as _]
-        .iter()
-        .enumerate()
-        .find(|(index, memory_type)| {
-            (1 << index) & memory_req.memory_type_bits != 0
-                && memory_type.property_flags & flags == flags
-        })
-        .map(|(index, _memory_type)| index as _)
-}
 
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
+const TEXTURE_PATH: &'static str = "assets/android.png";
 
 pub struct VulkanApp {
     pub entry: Entry,
@@ -73,6 +62,11 @@ pub struct VulkanApp {
     ubo_layout: vk::DescriptorSetLayout,
     pipeline_layout: vk::PipelineLayout,
     graphics_pipeline: vk::Pipeline,
+
+    texture_image: vk::Image,
+    texture_image_view: vk::ImageView,
+    texture_image_memory: vk::DeviceMemory,
+    texture_sampler: vk::Sampler,
 
     vertex_buffer: vk::Buffer,
     vertex_buffer_memory: vk::DeviceMemory,
@@ -155,6 +149,22 @@ impl VulkanApp {
                 swapchain_stuff.swapchain_extent,
             );
             let command_pool = create_command_pool(&device, &queue_family);
+            let (texture_image, texture_image_memory) = create_texture_image(
+                &device,
+                command_pool,
+                graphics_queue,
+                &physical_device_memory_properties,
+                &Path::new(TEXTURE_PATH),
+            );
+            let texture_image_view = create_image_view(
+                &device,
+                texture_image,
+                vk::Format::R8G8B8A8_UNORM,
+                vk::ImageAspectFlags::COLOR,
+                1,
+            );
+            let texture_sampler = create_texture_sampler(&device);
+
             let (vertex_buffer, vertex_buffer_memory) = create_vertex_buffer(
                 &device,
                 &physical_device_memory_properties,
@@ -182,6 +192,8 @@ impl VulkanApp {
                 descriptor_pool,
                 ubo_layout,
                 &uniform_buffers,
+                texture_image_view,
+                texture_sampler,
                 swapchain_stuff.swapchain_images.len(),
             );
 
@@ -263,6 +275,11 @@ impl VulkanApp {
                     ),
                 },
                 ubo_layout,
+
+                texture_image,
+                texture_image_memory,
+                texture_image_view,
+                texture_sampler,
             }
         }
     }
@@ -436,9 +453,8 @@ impl VulkanApp {
     }
 
     fn update_uniform_buffer(&mut self, current_image: usize, delta_time: f32) {
-
         self.uniform_transform.model =
-            Mat4x4::from_axis_angle(&Vec3::z_axis(), 1.0_f32*delta_time)
+            Mat4x4::from_axis_angle(&Vec3::z_axis(), 1.0_f32 * delta_time)
                 * self.uniform_transform.model;
         let ubos = [self.uniform_transform.clone()];
 
@@ -491,6 +507,12 @@ impl Drop for VulkanApp {
             self.device.destroy_buffer(self.index_buffer, None);
             self.device.free_memory(self.index_buffer_memory, None);
 
+            self.device.destroy_image(self.texture_image, None);
+            self.device.free_memory(self.texture_image_memory, None);
+            self.device.destroy_sampler(self.texture_sampler, None);
+            self.device
+                .destroy_image_view(self.texture_image_view, None);
+
             self.device.destroy_command_pool(self.command_pool, None);
 
             self.device.destroy_device(None);
@@ -520,8 +542,6 @@ impl ApplicationHandler for App {
         self.vk = Some(VulkanApp::new(window.clone()));
         self.window = Some(window);
         self.timer = Some(FPSLimiter::new());
-        let unifrom = self.vk.as_ref().unwrap().uniform_transform.clone();
-        println!("{:#?}", unifrom);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {

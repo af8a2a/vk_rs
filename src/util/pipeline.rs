@@ -63,9 +63,9 @@ pub fn create_graphics_pipeline(
     ubo_set_layout: vk::DescriptorSetLayout,
 ) -> (vk::Pipeline, vk::PipelineLayout) {
     let mut vertex_spv_file =
-        Cursor::new(&include_bytes!("../../shader/ubo/shader-ubo.vert.spv")[..]);
+        Cursor::new(&include_bytes!("../../shader/texture/textures.vert.spv")[..]);
     let mut frag_spv_file =
-        Cursor::new(&include_bytes!("../../shader/ubo/shader-ubo.frag.spv")[..]);
+        Cursor::new(&include_bytes!("../../shader/texture/textures.frag.spv")[..]);
 
     let vertex_code =
         read_spv(&mut vertex_spv_file).expect("Failed to read vertex shader spv file");
@@ -84,7 +84,6 @@ pub fn create_graphics_pipeline(
             ..Default::default()
         },
         vk::PipelineShaderStageCreateInfo {
-            s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
             module: frag_shader_module,
             p_name: main_function_name.as_ptr(),
             stage: vk::ShaderStageFlags::FRAGMENT,

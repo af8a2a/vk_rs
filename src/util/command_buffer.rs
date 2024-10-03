@@ -79,6 +79,8 @@ pub fn create_command_buffers(
     surface_extent: vk::Extent2D,
     vertex_buffer: vk::Buffer,
     index_buffer: vk::Buffer,
+    pipeline_layout: vk::PipelineLayout,
+    descriptor_sets: &Vec<vk::DescriptorSet>,
 ) -> Vec<vk::CommandBuffer> {
     let command_buffer_allocate_info = vk::CommandBufferAllocateInfo::default()
         .command_pool(command_pool)
@@ -129,12 +131,22 @@ pub fn create_command_buffers(
             );
             let vertex_buffers = [vertex_buffer];
             let offsets = [0_u64];
+            let descriptor_sets_to_bind = [descriptor_sets[i]];
+
             device.cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
             device.cmd_bind_index_buffer(
                 command_buffer,
                 index_buffer,
                 0,
                 vk::IndexType::UINT32,
+            );
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline_layout,
+                0,
+                &descriptor_sets_to_bind,
+                &[],
             );
 
             device.cmd_draw_indexed(command_buffer, INDICES_DATA.len() as u32, 1, 0, 0, 0);

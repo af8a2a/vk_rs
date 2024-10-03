@@ -3,11 +3,19 @@ use std::sync::Arc;
 use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
 use ash::{vk, Entry};
-use vk_rs::structures::{QueueFamilyIndices, SurfaceStuff, Vertex, INDICES_DATA, VERTICES_DATA};
-use vk_rs::util::buffer::{copy_buffer, create_buffer};
+use nalgebra_glm::{look_at, perspective, Mat4x4, Vec3};
+use vk_rs::structures::{
+    QueueFamilyIndices, SurfaceStuff, UniformBufferObject, Vertex, INDICES_DATA, VERTICES_DATA,
+};
+use vk_rs::util::buffer::{copy_buffer, create_buffer, create_index_buffer, create_vertex_buffer};
 use vk_rs::util::command_buffer::{create_command_buffers, create_command_pool};
 use vk_rs::util::debug::setup_debug_utils;
+use vk_rs::util::descriptor::{
+    create_descriptor_pool, create_descriptor_set_layout, create_descriptor_sets,
+    create_uniform_buffers,
+};
 use vk_rs::util::device::{create_logical_device, pick_physical_device};
+use vk_rs::util::fps_limiter::FPSLimiter;
 use vk_rs::util::framebuffer::create_framebuffers;
 use vk_rs::util::image::create_image_views;
 use vk_rs::util::instance::create_instance;
@@ -62,6 +70,7 @@ pub struct VulkanApp {
     swapchain_framebuffers: Vec<vk::Framebuffer>,
 
     render_pass: vk::RenderPass,
+    ubo_layout: vk::DescriptorSetLayout,
     pipeline_layout: vk::PipelineLayout,
     graphics_pipeline: vk::Pipeline,
 
@@ -70,8 +79,15 @@ pub struct VulkanApp {
     index_buffer: vk::Buffer,
     index_buffer_memory: vk::DeviceMemory,
 
+    uniform_transform: UniformBufferObject,
+    uniform_buffers: Vec<vk::Buffer>,
+    uniform_buffers_memory: Vec<vk::DeviceMemory>,
+
     command_pool: vk::CommandPool,
     command_buffers: Vec<vk::CommandBuffer>,
+
+    descriptor_pool: vk::DescriptorPool,
+    descriptor_sets: Vec<vk::DescriptorSet>,
 
     image_available_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
@@ -98,6 +114,8 @@ impl VulkanApp {
 
             let physical_device =
                 pick_physical_device(&instance, &surface_stuff, &device_extensions);
+            let physical_device_memory_properties =
+                instance.get_physical_device_memory_properties(physical_device);
 
             let (device, queue_family) =
                 create_logical_device(&instance, physical_device, &surface_stuff);
@@ -121,9 +139,14 @@ impl VulkanApp {
             );
 
             let render_pass = create_render_pass(&device, swapchain_stuff.swapchain_format);
+            let ubo_layout = create_descriptor_set_layout(&device);
 
-            let (graphics_pipeline, pipeline_layout) =
-                create_graphics_pipeline(&device, render_pass, swapchain_stuff.swapchain_extent);
+            let (graphics_pipeline, pipeline_layout) = create_graphics_pipeline(
+                &device,
+                render_pass,
+                swapchain_stuff.swapchain_extent,
+                ubo_layout,
+            );
 
             let swapchain_framebuffers = create_framebuffers(
                 &device,
@@ -132,21 +155,36 @@ impl VulkanApp {
                 swapchain_stuff.swapchain_extent,
             );
             let command_pool = create_command_pool(&device, &queue_family);
-            let (vertex_buffer, vertex_buffer_memory) = VulkanApp::create_vertex_buffer(
-                &instance,
+            let (vertex_buffer, vertex_buffer_memory) = create_vertex_buffer(
                 &device,
-                physical_device,
+                &physical_device_memory_properties,
                 command_pool,
                 graphics_queue,
+                &VERTICES_DATA,
             );
-            let (index_buffer, index_buffer_memory) = VulkanApp::create_index_buffer(
-                &instance,
+            let (index_buffer, index_buffer_memory) = create_index_buffer(
                 &device,
-                physical_device,
+                &physical_device_memory_properties,
                 command_pool,
                 graphics_queue,
+                &INDICES_DATA,
             );
-    
+
+            let (uniform_buffers, uniform_buffers_memory) = create_uniform_buffers(
+                &device,
+                &physical_device_memory_properties,
+                swapchain_stuff.swapchain_images.len(),
+            );
+            let descriptor_pool =
+                create_descriptor_pool(&device, swapchain_stuff.swapchain_images.len());
+            let descriptor_sets = create_descriptor_sets(
+                &device,
+                descriptor_pool,
+                ubo_layout,
+                &uniform_buffers,
+                swapchain_stuff.swapchain_images.len(),
+            );
+
             let command_buffers = create_command_buffers(
                 &device,
                 command_pool,
@@ -155,7 +193,9 @@ impl VulkanApp {
                 render_pass,
                 swapchain_stuff.swapchain_extent,
                 vertex_buffer,
-                index_buffer
+                index_buffer,
+                pipeline_layout,
+                &descriptor_sets,
             );
             let sync_ojbects = create_sync_objects(&device, MAX_FRAMES_IN_FLIGHT);
 
@@ -201,14 +241,35 @@ impl VulkanApp {
                 vertex_buffer_memory,
                 index_buffer,
                 index_buffer_memory,
-    
+
+                uniform_buffers,
+                uniform_buffers_memory,
+
+                descriptor_pool,
+                descriptor_sets,
+                uniform_transform: UniformBufferObject {
+                    model: Mat4x4::identity(),
+                    view: look_at(
+                        &Vec3::new(2.0, 2.0, 2.0),
+                        &Vec3::new(0.0, 0.0, 0.0),
+                        &Vec3::new(0.0, 0.0, 1.0),
+                    ),
+                    proj: perspective(
+                        swapchain_stuff.swapchain_extent.width as f32
+                            / swapchain_stuff.swapchain_extent.height as f32,
+                        45.0_f32.to_radians(),
+                        0.1,
+                        10.0,
+                    ),
+                },
+                ubo_layout,
             }
         }
     }
 }
 
 impl VulkanApp {
-    fn draw_frame(&mut self) {
+    fn draw_frame(&mut self, delta_time: f32) {
         let wait_fences = [self.in_flight_fences[self.current_frame]];
 
         unsafe {
@@ -236,14 +297,17 @@ impl VulkanApp {
             }
         };
 
+        self.update_uniform_buffer(image_index as usize, delta_time);
+
         let wait_semaphores = [self.image_available_semaphores[self.current_frame]];
         let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let signal_semaphores = [self.render_finished_semaphores[self.current_frame]];
 
+        let binding = [self.command_buffers[image_index as usize]];
         let submit_infos = [vk::SubmitInfo::default()
             .wait_semaphores(&wait_semaphores)
             .wait_dst_stage_mask(&wait_stages)
-            .command_buffers(&self.command_buffers)
+            .command_buffers(&binding)
             .signal_semaphores(&signal_semaphores)];
 
         unsafe {
@@ -321,10 +385,12 @@ impl VulkanApp {
         self.swapchain_imageviews =
             create_image_views(&self.device, self.swapchain_format, &self.swapchain_images);
         self.render_pass = create_render_pass(&self.device, self.swapchain_format);
+
         let (graphics_pipeline, pipeline_layout) = create_graphics_pipeline(
             &self.device,
             self.render_pass,
             swapchain_stuff.swapchain_extent,
+            self.ubo_layout,
         );
         self.graphics_pipeline = graphics_pipeline;
         self.pipeline_layout = pipeline_layout;
@@ -344,7 +410,9 @@ impl VulkanApp {
             self.render_pass,
             self.swapchain_extent,
             self.vertex_buffer,
-            self.index_buffer
+            self.index_buffer,
+            self.pipeline_layout,
+            &self.descriptor_sets,
         );
     }
 
@@ -367,127 +435,33 @@ impl VulkanApp {
         }
     }
 
-    fn create_vertex_buffer(
-        instance: &ash::Instance,
-        device: &ash::Device,
-        physical_device: vk::PhysicalDevice,
-        command_pool: vk::CommandPool,
-        submit_queue: vk::Queue,
-    ) -> (vk::Buffer, vk::DeviceMemory) {
-        let buffer_size = std::mem::size_of_val(&VERTICES_DATA) as vk::DeviceSize;
-        let device_memory_properties =
-            unsafe { instance.get_physical_device_memory_properties(physical_device) };
+    fn update_uniform_buffer(&mut self, current_image: usize, delta_time: f32) {
 
-        let (staging_buffer, staging_buffer_memory) = create_buffer(
-            device,
-            buffer_size,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-            &device_memory_properties,
-        );
+        self.uniform_transform.model =
+            Mat4x4::from_axis_angle(&Vec3::z_axis(), 1.0_f32*delta_time)
+                * self.uniform_transform.model;
+        let ubos = [self.uniform_transform.clone()];
+
+        let buffer_size = (std::mem::size_of::<UniformBufferObject>() * ubos.len()) as u64;
 
         unsafe {
-            let data_ptr = device
-                .map_memory(
-                    staging_buffer_memory,
-                    0,
-                    buffer_size,
-                    vk::MemoryMapFlags::empty(),
-                )
-                .expect("Failed to Map Memory") as *mut Vertex;
+            let data_ptr =
+                self.device
+                    .map_memory(
+                        self.uniform_buffers_memory[current_image],
+                        0,
+                        buffer_size,
+                        vk::MemoryMapFlags::empty(),
+                    )
+                    .expect("Failed to Map Memory") as *mut UniformBufferObject;
 
-            data_ptr.copy_from_nonoverlapping(VERTICES_DATA.as_ptr(), VERTICES_DATA.len());
+            data_ptr.copy_from_nonoverlapping(ubos.as_ptr(), ubos.len());
 
-            device.unmap_memory(staging_buffer_memory);
+            self.device
+                .unmap_memory(self.uniform_buffers_memory[current_image]);
         }
-
-        let (vertex_buffer, vertex_buffer_memory) = create_buffer(
-            device,
-            buffer_size,
-            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
-            &device_memory_properties,
-        );
-
-        copy_buffer(
-            device,
-            submit_queue,
-            command_pool,
-            staging_buffer,
-            vertex_buffer,
-            buffer_size,
-        );
-
-        unsafe {
-            device.destroy_buffer(staging_buffer, None);
-            device.free_memory(staging_buffer_memory, None);
-        }
-
-        (vertex_buffer, vertex_buffer_memory)
     }
-
-    fn create_index_buffer(
-        instance: &ash::Instance,
-        device: &ash::Device,
-        physical_device: vk::PhysicalDevice,
-        command_pool: vk::CommandPool,
-        submit_queue: vk::Queue,
-    ) -> (vk::Buffer, vk::DeviceMemory) {
-        let buffer_size = std::mem::size_of_val(&INDICES_DATA) as vk::DeviceSize;
-        let device_memory_properties =
-            unsafe { instance.get_physical_device_memory_properties(physical_device) };
-
-        let (staging_buffer, staging_buffer_memory) = create_buffer(
-            device,
-            buffer_size,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-            &device_memory_properties,
-        );
-
-        unsafe {
-            let data_ptr = device
-                .map_memory(
-                    staging_buffer_memory,
-                    0,
-                    buffer_size,
-                    vk::MemoryMapFlags::empty(),
-                )
-                .expect("Failed to Map Memory") as *mut u32;
-
-            data_ptr.copy_from_nonoverlapping(INDICES_DATA.as_ptr(), INDICES_DATA.len());
-
-            device.unmap_memory(staging_buffer_memory);
-        }
-
-        let (index_buffer, index_buffer_memory) = create_buffer(
-            device,
-            buffer_size,
-            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
-            &device_memory_properties,
-        );
-
-        copy_buffer(
-            device,
-            submit_queue,
-            command_pool,
-            staging_buffer,
-            index_buffer,
-            buffer_size,
-        );
-
-        unsafe {
-            device.destroy_buffer(staging_buffer, None);
-            device.free_memory(staging_buffer_memory, None);
-        }
-
-        (index_buffer, index_buffer_memory)
-    }
-
-
 }
-
 impl Drop for VulkanApp {
     fn drop(&mut self) {
         unsafe {
@@ -499,13 +473,23 @@ impl Drop for VulkanApp {
                     .destroy_semaphore(self.render_finished_semaphores[i], None);
                 self.device.destroy_fence(self.in_flight_fences[i], None);
             }
-            self.device.destroy_buffer(self.vertex_buffer, None);
-            self.device.free_memory(self.vertex_buffer_memory, None);
-            self.device.destroy_buffer(self.index_buffer,None);
-            self.device.free_memory(self.index_buffer_memory, None);
-
 
             self.cleanup_swapchain();
+
+            self.device
+                .destroy_descriptor_pool(self.descriptor_pool, None);
+            for i in 0..self.uniform_buffers.len() {
+                self.device.destroy_buffer(self.uniform_buffers[i], None);
+                self.device
+                    .free_memory(self.uniform_buffers_memory[i], None);
+            }
+            self.device
+                .destroy_descriptor_set_layout(self.ubo_layout, None);
+
+            self.device.destroy_buffer(self.vertex_buffer, None);
+            self.device.free_memory(self.vertex_buffer_memory, None);
+            self.device.destroy_buffer(self.index_buffer, None);
+            self.device.free_memory(self.index_buffer_memory, None);
 
             self.device.destroy_command_pool(self.command_pool, None);
 
@@ -523,6 +507,7 @@ impl Drop for VulkanApp {
 struct App {
     window: Option<Arc<Window>>,
     vk: Option<VulkanApp>,
+    timer: Option<FPSLimiter>,
 }
 
 impl ApplicationHandler for App {
@@ -534,11 +519,13 @@ impl ApplicationHandler for App {
         );
         self.vk = Some(VulkanApp::new(window.clone()));
         self.window = Some(window);
+        self.timer = Some(FPSLimiter::new());
+        let unifrom = self.vk.as_ref().unwrap().uniform_transform.clone();
+        println!("{:#?}", unifrom);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // println!("extend2d:{:#?}", self.vk.as_ref().unwrap().surface_resolution);
-
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
@@ -546,7 +533,11 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 if self.vk.is_some() {
-                    self.vk.as_mut().unwrap().draw_frame();
+                    let timer = self.timer.as_mut().unwrap();
+                    let delta_time = timer.delta_time();
+
+                    self.vk.as_mut().unwrap().draw_frame(delta_time);
+                    timer.tick_frame();
                 }
                 self.window.as_ref().unwrap().request_redraw();
             }
@@ -554,7 +545,6 @@ impl ApplicationHandler for App {
         }
     }
 }
-
 
 fn main() {
     let event_loop = EventLoop::new().unwrap();

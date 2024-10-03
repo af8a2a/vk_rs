@@ -1,6 +1,7 @@
 use std::mem::offset_of;
 
 use ash::vk;
+use nalgebra_glm::Mat4x4;
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
@@ -54,6 +55,16 @@ pub const VERTICES_DATA: [Vertex; 4] = [
     },
 ];
 pub const INDICES_DATA: [u32; 6] = [0, 1, 2, 2, 3, 0];
+
+
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct UniformBufferObject {
+   pub model: Mat4x4,
+   pub view: Mat4x4,
+   pub proj: Mat4x4,
+}
+
 
 pub struct SyncObjects {
     pub image_available_semaphores: Vec<vk::Semaphore>,

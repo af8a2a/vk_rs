@@ -7,8 +7,6 @@ use ash::{
 
 use crate::structures::Vertex;
 
-
-
 pub fn create_render_pass(device: &ash::Device, surface_format: vk::Format) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
         format: surface_format,
@@ -62,11 +60,12 @@ pub fn create_graphics_pipeline(
     device: &ash::Device,
     render_pass: vk::RenderPass,
     swapchain_extent: vk::Extent2D,
+    ubo_set_layout: vk::DescriptorSetLayout,
 ) -> (vk::Pipeline, vk::PipelineLayout) {
     let mut vertex_spv_file =
-        Cursor::new(&include_bytes!("../../shader/triangle/triangle.vert.spv")[..]);
+        Cursor::new(&include_bytes!("../../shader/ubo/shader-ubo.vert.spv")[..]);
     let mut frag_spv_file =
-        Cursor::new(&include_bytes!("../../shader/triangle/triangle.frag.spv")[..]);
+        Cursor::new(&include_bytes!("../../shader/ubo/shader-ubo.frag.spv")[..]);
 
     let vertex_code =
         read_spv(&mut vertex_spv_file).expect("Failed to read vertex shader spv file");
@@ -95,7 +94,6 @@ pub fn create_graphics_pipeline(
 
     let binding_description = Vertex::get_binding_descriptions();
     let attribute_description = Vertex::get_attribute_descriptions();
-
 
     let vertex_input_state_create_info = vk::PipelineVertexInputStateCreateInfo::default()
         .vertex_attribute_descriptions(&attribute_description)
@@ -168,7 +166,8 @@ pub fn create_graphics_pipeline(
         .logic_op(vk::LogicOp::CLEAR)
         .attachments(&color_blend_attachment_states);
 
-    let pipeline_layout_create_info = PipelineLayoutCreateInfo::default();
+    let set_layouts = [ubo_set_layout];
+    let pipeline_layout_create_info = PipelineLayoutCreateInfo::default().set_layouts(&set_layouts);
 
     let pipeline_layout = unsafe {
         device

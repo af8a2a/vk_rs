@@ -102,3 +102,120 @@ pub fn copy_buffer(
         device.free_command_buffers(command_pool, &command_buffers);
     }
 }
+
+
+
+pub fn create_vertex_buffer<T>(
+    device: &ash::Device,
+    device_memory_properties: &vk::PhysicalDeviceMemoryProperties,
+    command_pool: vk::CommandPool,
+    submit_queue: vk::Queue,
+    data: &[T],
+) -> (vk::Buffer, vk::DeviceMemory) {
+    let buffer_size = ::std::mem::size_of_val(data) as vk::DeviceSize;
+
+    let (staging_buffer, staging_buffer_memory) = create_buffer(
+        device,
+        buffer_size,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        &device_memory_properties,
+    );
+
+    unsafe {
+        let data_ptr = device
+            .map_memory(
+                staging_buffer_memory,
+                0,
+                buffer_size,
+                vk::MemoryMapFlags::empty(),
+            )
+            .expect("Failed to Map Memory") as *mut T;
+
+        data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
+
+        device.unmap_memory(staging_buffer_memory);
+    }
+
+    let (vertex_buffer, vertex_buffer_memory) = create_buffer(
+        device,
+        buffer_size,
+        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        &device_memory_properties,
+    );
+
+    copy_buffer(
+        device,
+        submit_queue,
+        command_pool,
+        staging_buffer,
+        vertex_buffer,
+        buffer_size,
+    );
+
+    unsafe {
+        device.destroy_buffer(staging_buffer, None);
+        device.free_memory(staging_buffer_memory, None);
+    }
+
+    (vertex_buffer, vertex_buffer_memory)
+}
+
+
+pub fn create_index_buffer(
+    device: &ash::Device,
+    device_memory_properties: &vk::PhysicalDeviceMemoryProperties,
+    command_pool: vk::CommandPool,
+    submit_queue: vk::Queue,
+    data: &[u32],
+) -> (vk::Buffer, vk::DeviceMemory) {
+    let buffer_size = ::std::mem::size_of_val(data) as vk::DeviceSize;
+
+    let (staging_buffer, staging_buffer_memory) = create_buffer(
+        device,
+        buffer_size,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        &device_memory_properties,
+    );
+
+    unsafe {
+        let data_ptr = device
+            .map_memory(
+                staging_buffer_memory,
+                0,
+                buffer_size,
+                vk::MemoryMapFlags::empty(),
+            )
+            .expect("Failed to Map Memory") as *mut u32;
+
+        data_ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
+
+        device.unmap_memory(staging_buffer_memory);
+    }
+
+    let (index_buffer, index_buffer_memory) = create_buffer(
+        device,
+        buffer_size,
+        vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        &device_memory_properties,
+    );
+
+    copy_buffer(
+        device,
+        submit_queue,
+        command_pool,
+        staging_buffer,
+        index_buffer,
+        buffer_size,
+    );
+
+    unsafe {
+        device.destroy_buffer(staging_buffer, None);
+        device.free_memory(staging_buffer_memory, None);
+    }
+
+    (index_buffer, index_buffer_memory)
+}

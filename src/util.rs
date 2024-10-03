@@ -9,12 +9,12 @@ pub mod instance;
 pub mod framebuffer;
 pub mod surface;
 pub mod buffer;
+pub mod descriptor;
+pub mod fps_limiter;
+
 use std::ffi::{c_char, CStr};
 
 use ash::vk::{self};
-
-
-
 
 /// Helper function to convert [c_char; SIZE] to string
 pub fn vk_to_string(raw_string_array: &[c_char]) -> String {

@@ -6,7 +6,7 @@ use nalgebra_glm::Mat4x4;
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
-    pub pos: [f32; 2],
+    pub pos: [f32; 3],
     pub color: [f32; 3],
     pub tex_coord: [f32; 2],
 }
@@ -24,7 +24,7 @@ impl Vertex {
             vk::VertexInputAttributeDescription {
                 location: 0,
                 binding: 0,
-                format: vk::Format::R32G32_SFLOAT,
+                format: vk::Format::R32G32B32_SFLOAT,
                 offset: offset_of!(Self, pos) as u32,
             },
             vk::VertexInputAttributeDescription {
@@ -43,29 +43,49 @@ impl Vertex {
     }
 }
 
-pub const VERTICES_DATA: [Vertex; 4] = [
+pub const VERTICES_DATA: [Vertex; 8] = [
     Vertex {
-        pos: [-0.75, -0.75],
+        pos: [-0.75, -0.75, 0.0],
         color: [1.0, 0.0, 0.0],
-        tex_coord: [1.0, 0.0],
-    },
-    Vertex {
-        pos: [0.75, -0.75],
-        color: [0.0, 1.0, 0.0],
         tex_coord: [0.0, 0.0],
     },
     Vertex {
-        pos: [0.75, 0.75],
+        pos: [0.75, -0.75, 0.0],
+        color: [0.0, 1.0, 0.0],
+        tex_coord: [1.0, 0.0],
+    },
+    Vertex {
+        pos: [0.75, 0.75, 0.0],
         color: [0.0, 0.0, 1.0],
+        tex_coord: [1.0, 1.0],
+    },
+    Vertex {
+        pos: [-0.75, 0.75, 0.0],
+        color: [1.0, 1.0, 1.0],
         tex_coord: [0.0, 1.0],
     },
     Vertex {
-        pos: [-0.75, 0.75],
-        color: [1.0, 1.0, 1.0],
+        pos: [-0.75, -0.75, -0.75],
+        color: [1.0, 0.0, 0.0],
+        tex_coord: [0.0, 0.0],
+    },
+    Vertex {
+        pos: [0.75, -0.75, -0.75],
+        color: [0.0, 1.0, 0.0],
+        tex_coord: [1.0, 0.0],
+    },
+    Vertex {
+        pos: [0.75, 0.75, -0.75],
+        color: [0.0, 0.0, 1.0],
         tex_coord: [1.0, 1.0],
     },
+    Vertex {
+        pos: [-0.75, 0.75, -0.75],
+        color: [1.0, 1.0, 1.0],
+        tex_coord: [0.0, 1.0],
+    },
 ];
-pub const INDICES_DATA: [u32; 6] = [0, 1, 2, 2, 3, 0];
+pub const INDICES_DATA: [u32; 12] = [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4];
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]

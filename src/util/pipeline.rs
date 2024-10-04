@@ -7,7 +7,14 @@ use ash::{
 
 use crate::structures::Vertex;
 
-pub fn create_render_pass(device: &ash::Device, surface_format: vk::Format) -> vk::RenderPass {
+use super::find_depth_format;
+
+pub fn create_render_pass(
+    instance: &ash::Instance,
+    device: &ash::Device,
+    physcial_device: vk::PhysicalDevice,
+    surface_format: vk::Format,
+) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
         format: surface_format,
         flags: vk::AttachmentDescriptionFlags::empty(),
@@ -19,19 +26,35 @@ pub fn create_render_pass(device: &ash::Device, surface_format: vk::Format) -> v
         initial_layout: vk::ImageLayout::UNDEFINED,
         final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
     };
+    let depth_attachment = vk::AttachmentDescription {
+        flags: vk::AttachmentDescriptionFlags::empty(),
+        format: find_depth_format(instance, physcial_device),
+        samples: vk::SampleCountFlags::TYPE_1,
+        load_op: vk::AttachmentLoadOp::CLEAR,
+        store_op: vk::AttachmentStoreOp::DONT_CARE,
+        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+        initial_layout: vk::ImageLayout::UNDEFINED,
+        final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
 
     let color_attachment_ref = vk::AttachmentReference {
         attachment: 0,
         layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
     };
+    let depth_attachment_ref = vk::AttachmentReference {
+        attachment: 1,
+        layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
 
     let binding = [color_attachment_ref];
     let subpasses = [vk::SubpassDescription::default()
         .color_attachments(&binding)
+        .depth_stencil_attachment(&depth_attachment_ref)
         .flags(vk::SubpassDescriptionFlags::empty())
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)];
 
-    let render_pass_attachments = [color_attachment];
+    let render_pass_attachments = [color_attachment, depth_attachment];
 
     let subpass_dependencies = [vk::SubpassDependency {
         src_subpass: vk::SUBPASS_EXTERNAL,
@@ -39,7 +62,8 @@ pub fn create_render_pass(device: &ash::Device, surface_format: vk::Format) -> v
         src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
         dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
         src_access_mask: vk::AccessFlags::empty(),
-        dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+        dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
+            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
         dependency_flags: vk::DependencyFlags::empty(),
     }];
 
@@ -62,10 +86,8 @@ pub fn create_graphics_pipeline(
     swapchain_extent: vk::Extent2D,
     ubo_set_layout: vk::DescriptorSetLayout,
 ) -> (vk::Pipeline, vk::PipelineLayout) {
-    let mut vertex_spv_file =
-        Cursor::new(&include_bytes!("../../shader/texture/textures.vert.spv")[..]);
-    let mut frag_spv_file =
-        Cursor::new(&include_bytes!("../../shader/texture/textures.frag.spv")[..]);
+    let mut vertex_spv_file = Cursor::new(&include_bytes!("../../shader/depth/depth.vert.spv")[..]);
+    let mut frag_spv_file = Cursor::new(&include_bytes!("../../shader/depth/depth.frag.spv")[..]);
 
     let vertex_code =
         read_spv(&mut vertex_spv_file).expect("Failed to read vertex shader spv file");
@@ -132,7 +154,7 @@ pub fn create_graphics_pipeline(
         ..Default::default()
     };
 
-    let noop_stencil_state = vk::StencilOpState {
+    let stencil_state = vk::StencilOpState {
         fail_op: vk::StencilOp::KEEP,
         pass_op: vk::StencilOp::KEEP,
         depth_fail_op: vk::StencilOp::KEEP,
@@ -144,26 +166,31 @@ pub fn create_graphics_pipeline(
         depth_test_enable: 1,
         depth_write_enable: 1,
         depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
-        front: noop_stencil_state,
-        back: noop_stencil_state,
+        depth_bounds_test_enable: 0,
+        stencil_test_enable: 0,
+        front: stencil_state,
+        back: stencil_state,
+        min_depth_bounds: 0.0,
         max_depth_bounds: 1.0,
         ..Default::default()
     };
 
     let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
         blend_enable: 0,
-        src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-        dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+        src_color_blend_factor: vk::BlendFactor::ONE,
+        dst_color_blend_factor: vk::BlendFactor::ZERO,
         color_blend_op: vk::BlendOp::ADD,
-        src_alpha_blend_factor: vk::BlendFactor::ZERO,
+        src_alpha_blend_factor: vk::BlendFactor::ONE,
         dst_alpha_blend_factor: vk::BlendFactor::ZERO,
         alpha_blend_op: vk::BlendOp::ADD,
         color_write_mask: vk::ColorComponentFlags::RGBA,
     }];
 
     let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
-        .logic_op(vk::LogicOp::CLEAR)
-        .attachments(&color_blend_attachment_states);
+        .logic_op(vk::LogicOp::COPY)
+        .logic_op_enable(false)
+        .attachments(&color_blend_attachment_states)
+        .blend_constants([0.0, 0.0, 0.0, 0.0]);
 
     let set_layouts = [ubo_set_layout];
     let pipeline_layout_create_info = PipelineLayoutCreateInfo::default().set_layouts(&set_layouts);
@@ -184,7 +211,8 @@ pub fn create_graphics_pipeline(
         .depth_stencil_state(&depth_state_create_info)
         .color_blend_state(&color_blend_state)
         .layout(pipeline_layout)
-        .render_pass(render_pass)];
+        .render_pass(render_pass)
+        .base_pipeline_index(-1)];
 
     let graphics_pipelines = unsafe {
         device

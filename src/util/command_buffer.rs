@@ -101,11 +101,20 @@ pub fn create_command_buffers(
                 .expect("Failed to begin recording Command Buffer at beginning!");
         }
 
-        let clear_values = [vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 1.0],
+        let clear_values = [
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
             },
-        }];
+            vk::ClearValue {
+                // clear value for depth buffer
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
 
         let render_pass_begin_info = vk::RenderPassBeginInfo::default()
             .render_pass(render_pass)

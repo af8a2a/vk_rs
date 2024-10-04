@@ -4,12 +4,13 @@ pub fn create_framebuffers(
     device: &ash::Device,
     render_pass: vk::RenderPass,
     image_views: &Vec<vk::ImageView>,
+    depth_image_view: vk::ImageView,
     swapchain_extent: vk::Extent2D,
 ) -> Vec<vk::Framebuffer> {
     let mut framebuffers = vec![];
 
     for &image_view in image_views.iter() {
-        let attachments = [image_view];
+        let attachments = [image_view, depth_image_view];
 
         let framebuffer_create_info = vk::FramebufferCreateInfo::default()
             .attachments(&attachments)

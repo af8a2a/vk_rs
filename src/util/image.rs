@@ -62,10 +62,12 @@ pub fn create_image_view(
     }
 }
 
-fn create_image(
+pub fn create_image(
     device: &ash::Device,
     width: u32,
     height: u32,
+    mip_levels: u32,
+    num_samples: vk::SampleCountFlags,
     format: vk::Format,
     tiling: vk::ImageTiling,
     usage: vk::ImageUsageFlags,
@@ -80,10 +82,10 @@ fn create_image(
             height,
             depth: 1,
         })
-        .mip_levels(1)
+        .mip_levels(mip_levels)
         .array_layers(1)
         .array_layers(1)
-        .samples(vk::SampleCountFlags::TYPE_1)
+        .samples(num_samples)
         .tiling(tiling)
         .usage(usage)
         .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -163,6 +165,8 @@ pub fn create_texture_image(
         device,
         image_width,
         image_height,
+        1,
+        vk::SampleCountFlags::TYPE_1,
         vk::Format::R8G8B8A8_UNORM,
         vk::ImageTiling::OPTIMAL,
         vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,

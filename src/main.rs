@@ -16,9 +16,12 @@ use vk_rs::util::descriptor::{
     create_uniform_buffers,
 };
 use vk_rs::util::device::{create_logical_device, pick_physical_device};
+use vk_rs::util::find_depth_format;
 use vk_rs::util::fps_limiter::FPSLimiter;
 use vk_rs::util::framebuffer::create_framebuffers;
-use vk_rs::util::image::{create_image_view, create_image_views, create_texture_image};
+use vk_rs::util::image::{
+    create_image, create_image_view, create_image_views, create_texture_image,
+};
 use vk_rs::util::instance::create_instance;
 use vk_rs::util::pipeline::{create_graphics_pipeline, create_render_pass};
 use vk_rs::util::sampler::create_texture_sampler;
@@ -67,6 +70,10 @@ pub struct VulkanApp {
     texture_image_view: vk::ImageView,
     texture_image_memory: vk::DeviceMemory,
     texture_sampler: vk::Sampler,
+
+    depth_image: vk::Image,
+    depth_image_view: vk::ImageView,
+    depth_image_memory: vk::DeviceMemory,
 
     vertex_buffer: vk::Buffer,
     vertex_buffer_memory: vk::DeviceMemory,
@@ -132,7 +139,12 @@ impl VulkanApp {
                 &swapchain_stuff.swapchain_images,
             );
 
-            let render_pass = create_render_pass(&device, swapchain_stuff.swapchain_format);
+            let render_pass = create_render_pass(
+                &instance,
+                &device,
+                physical_device,
+                swapchain_stuff.swapchain_format,
+            );
             let ubo_layout = create_descriptor_set_layout(&device);
 
             let (graphics_pipeline, pipeline_layout) = create_graphics_pipeline(
@@ -142,13 +154,8 @@ impl VulkanApp {
                 ubo_layout,
             );
 
-            let swapchain_framebuffers = create_framebuffers(
-                &device,
-                render_pass,
-                &swapchain_imageviews,
-                swapchain_stuff.swapchain_extent,
-            );
             let command_pool = create_command_pool(&device, &queue_family);
+
             let (texture_image, texture_image_memory) = create_texture_image(
                 &device,
                 command_pool,
@@ -178,6 +185,24 @@ impl VulkanApp {
                 command_pool,
                 graphics_queue,
                 &INDICES_DATA,
+            );
+
+            let (depth_image, depth_image_view, depth_image_memory) = Self::create_depth_resources(
+                &instance,
+                &device,
+                physical_device,
+                command_pool,
+                graphics_queue,
+                swapchain_stuff.swapchain_extent,
+                &physical_device_memory_properties,
+            );
+
+            let swapchain_framebuffers = create_framebuffers(
+                &device,
+                render_pass,
+                &swapchain_imageviews,
+                depth_image_view,
+                swapchain_stuff.swapchain_extent,
             );
 
             let (uniform_buffers, uniform_buffers_memory) = create_uniform_buffers(
@@ -280,6 +305,10 @@ impl VulkanApp {
                 texture_image_memory,
                 texture_image_view,
                 texture_sampler,
+
+                depth_image,
+                depth_image_view,
+                depth_image_memory,
             }
         }
     }
@@ -401,7 +430,12 @@ impl VulkanApp {
 
         self.swapchain_imageviews =
             create_image_views(&self.device, self.swapchain_format, &self.swapchain_images);
-        self.render_pass = create_render_pass(&self.device, self.swapchain_format);
+        self.render_pass = create_render_pass(
+            &self.instance,
+            &self.device,
+            self.physical_device,
+            self.swapchain_format,
+        );
 
         let (graphics_pipeline, pipeline_layout) = create_graphics_pipeline(
             &self.device,
@@ -416,6 +450,7 @@ impl VulkanApp {
             &self.device,
             self.render_pass,
             &self.swapchain_imageviews,
+            self.depth_image_view,
             self.swapchain_extent,
         );
 
@@ -435,6 +470,11 @@ impl VulkanApp {
 
     fn cleanup_swapchain(&self) {
         unsafe {
+            self.device.destroy_image_view(self.depth_image_view, None);
+            self.device.destroy_image(self.depth_image, None);
+            self.device.free_memory(self.depth_image_memory, None);
+
+
             self.device
                 .free_command_buffers(self.command_pool, &self.command_buffers);
             for &framebuffer in self.swapchain_framebuffers.iter() {
@@ -477,6 +517,39 @@ impl VulkanApp {
                 .unmap_memory(self.uniform_buffers_memory[current_image]);
         }
     }
+
+    fn create_depth_resources(
+        instance: &ash::Instance,
+        device: &ash::Device,
+        physical_device: vk::PhysicalDevice,
+        _command_pool: vk::CommandPool,
+        _submit_queue: vk::Queue,
+        swapchain_extent: vk::Extent2D,
+        device_memory_properties: &vk::PhysicalDeviceMemoryProperties,
+    ) -> (vk::Image, vk::ImageView, vk::DeviceMemory) {
+        let depth_format = find_depth_format(instance, physical_device);
+        let (depth_image, depth_image_memory) = create_image(
+            device,
+            swapchain_extent.width,
+            swapchain_extent.height,
+            1,
+            vk::SampleCountFlags::TYPE_1,
+            depth_format,
+            vk::ImageTiling::OPTIMAL,
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            device_memory_properties,
+        );
+        let depth_image_view = create_image_view(
+            device,
+            depth_image,
+            depth_format,
+            vk::ImageAspectFlags::DEPTH,
+            1,
+        );
+
+        (depth_image, depth_image_view, depth_image_memory)
+    }
 }
 impl Drop for VulkanApp {
     fn drop(&mut self) {
@@ -494,6 +567,7 @@ impl Drop for VulkanApp {
 
             self.device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
+
             for i in 0..self.uniform_buffers.len() {
                 self.device.destroy_buffer(self.uniform_buffers[i], None);
                 self.device

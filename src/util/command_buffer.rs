@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::structures::{QueueFamilyIndices, INDICES_DATA};
+use crate::structures::QueueFamilyIndices;
 
 /// Helper function for submitting command buffers. Immediately waits for the fence before the command buffer
 /// is executed. That way we can delay the waiting for the fences by 1 frame which is good for performance.
@@ -80,6 +80,7 @@ pub fn create_command_buffers(
     index_buffer: vk::Buffer,
     pipeline_layout: vk::PipelineLayout,
     descriptor_sets: &Vec<vk::DescriptorSet>,
+    index_count: u32,
 ) -> Vec<vk::CommandBuffer> {
     let command_buffer_allocate_info = vk::CommandBufferAllocateInfo::default()
         .command_pool(command_pool)
@@ -152,7 +153,7 @@ pub fn create_command_buffers(
                 &[],
             );
 
-            device.cmd_draw_indexed(command_buffer, INDICES_DATA.len() as u32, 1, 0, 0, 0);
+            device.cmd_draw_indexed(command_buffer, index_count, 1, 0, 0, 0);
 
             device.cmd_end_render_pass(command_buffer);
 

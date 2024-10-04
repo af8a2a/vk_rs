@@ -1,13 +1,11 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
 use ash::{vk, Entry};
 use nalgebra_glm::{look_at, perspective, Mat4x4, Vec3};
-use vk_rs::structures::{
-    QueueFamilyIndices, SurfaceStuff, UniformBufferObject, Vertex, INDICES_DATA, VERTICES_DATA,
-};
+use vk_rs::structures::{QueueFamilyIndices, SurfaceStuff, UniformBufferObject, Vertex};
 use vk_rs::util::buffer::{copy_buffer, create_buffer, create_index_buffer, create_vertex_buffer};
 use vk_rs::util::command_buffer::{create_command_buffers, create_command_pool};
 use vk_rs::util::debug::setup_debug_utils;
@@ -16,7 +14,6 @@ use vk_rs::util::descriptor::{
     create_uniform_buffers,
 };
 use vk_rs::util::device::{create_logical_device, pick_physical_device};
-use vk_rs::util::find_depth_format;
 use vk_rs::util::fps_limiter::FPSLimiter;
 use vk_rs::util::framebuffer::create_framebuffers;
 use vk_rs::util::image::{
@@ -28,13 +25,15 @@ use vk_rs::util::sampler::create_texture_sampler;
 use vk_rs::util::surface::create_surface;
 use vk_rs::util::swapchain::create_swapchain;
 use vk_rs::util::sync::create_sync_objects;
+use vk_rs::util::{find_depth_format, load_model};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
-const TEXTURE_PATH: &'static str = "assets/android.png";
+const TEXTURE_PATH: &'static str = "assets/chalet.jpg";
+const MODEL_PATH: &'static str = "assets/chalet.obj";
 
 pub struct VulkanApp {
     pub entry: Entry,
@@ -48,6 +47,7 @@ pub struct VulkanApp {
     debug_merssager: vk::DebugUtilsMessengerEXT,
 
     physical_device: vk::PhysicalDevice,
+    memory_properties: vk::PhysicalDeviceMemoryProperties,
 
     queue_family: QueueFamilyIndices,
     graphics_queue: vk::Queue,
@@ -74,6 +74,9 @@ pub struct VulkanApp {
     depth_image: vk::Image,
     depth_image_view: vk::ImageView,
     depth_image_memory: vk::DeviceMemory,
+
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
 
     vertex_buffer: vk::Buffer,
     vertex_buffer_memory: vk::DeviceMemory,
@@ -166,25 +169,27 @@ impl VulkanApp {
             let texture_image_view = create_image_view(
                 &device,
                 texture_image,
-                vk::Format::R8G8B8A8_UNORM,
+                vk::Format::R8G8B8A8_SRGB,
                 vk::ImageAspectFlags::COLOR,
                 1,
             );
             let texture_sampler = create_texture_sampler(&device);
+
+            let (vertices, indices) = load_model(Path::new(MODEL_PATH));
 
             let (vertex_buffer, vertex_buffer_memory) = create_vertex_buffer(
                 &device,
                 &physical_device_memory_properties,
                 command_pool,
                 graphics_queue,
-                &VERTICES_DATA,
+                &vertices,
             );
             let (index_buffer, index_buffer_memory) = create_index_buffer(
                 &device,
                 &physical_device_memory_properties,
                 command_pool,
                 graphics_queue,
-                &INDICES_DATA,
+                &indices,
             );
 
             let (depth_image, depth_image_view, depth_image_memory) = Self::create_depth_resources(
@@ -195,6 +200,7 @@ impl VulkanApp {
                 graphics_queue,
                 swapchain_stuff.swapchain_extent,
                 &physical_device_memory_properties,
+                vk::SampleCountFlags::TYPE_1,
             );
 
             let swapchain_framebuffers = create_framebuffers(
@@ -233,9 +239,25 @@ impl VulkanApp {
                 index_buffer,
                 pipeline_layout,
                 &descriptor_sets,
+                indices.len() as u32,
             );
             let sync_ojbects = create_sync_objects(&device, MAX_FRAMES_IN_FLIGHT);
-
+            let mut uniform_transform=UniformBufferObject {
+                model: Mat4x4::identity(),
+                view: look_at(
+                    &Vec3::new(2.0, 2.0, 2.0),
+                    &Vec3::new(0.0, 0.0, 0.0),
+                    &Vec3::new(0.0, 0.0, 1.0),
+                ),
+                proj: perspective(
+                    swapchain_stuff.swapchain_extent.width as f32
+                        / swapchain_stuff.swapchain_extent.height as f32,
+                    45.0_f32.to_radians(),
+                    0.1,
+                    10.0,
+                ),
+            };
+            *uniform_transform.proj.index_mut((1,1))*=-1.0;
             Self {
                 entry,
                 instance,
@@ -284,21 +306,7 @@ impl VulkanApp {
 
                 descriptor_pool,
                 descriptor_sets,
-                uniform_transform: UniformBufferObject {
-                    model: Mat4x4::identity(),
-                    view: look_at(
-                        &Vec3::new(2.0, 2.0, 2.0),
-                        &Vec3::new(0.0, 0.0, 0.0),
-                        &Vec3::new(0.0, 0.0, 1.0),
-                    ),
-                    proj: perspective(
-                        swapchain_stuff.swapchain_extent.width as f32
-                            / swapchain_stuff.swapchain_extent.height as f32,
-                        45.0_f32.to_radians(),
-                        0.1,
-                        10.0,
-                    ),
-                },
+                uniform_transform,
                 ubo_layout,
 
                 texture_image,
@@ -309,6 +317,11 @@ impl VulkanApp {
                 depth_image,
                 depth_image_view,
                 depth_image_memory,
+
+                vertices,
+                indices,
+
+                memory_properties: physical_device_memory_properties
             }
         }
     }
@@ -446,6 +459,22 @@ impl VulkanApp {
         self.graphics_pipeline = graphics_pipeline;
         self.pipeline_layout = pipeline_layout;
 
+
+        let depth_resources = Self::create_depth_resources(
+            &self.instance,
+            &self.device,
+            self.physical_device,
+            self.command_pool,
+            self.graphics_queue,
+            self.swapchain_extent,
+            &self.memory_properties,
+            vk::SampleCountFlags::TYPE_1,
+        );
+        self.depth_image = depth_resources.0;
+        self.depth_image_view = depth_resources.1;
+        self.depth_image_memory = depth_resources.2;
+
+
         self.swapchain_framebuffers = create_framebuffers(
             &self.device,
             self.render_pass,
@@ -453,6 +482,8 @@ impl VulkanApp {
             self.depth_image_view,
             self.swapchain_extent,
         );
+
+
 
         self.command_buffers = create_command_buffers(
             &self.device,
@@ -465,6 +496,7 @@ impl VulkanApp {
             self.index_buffer,
             self.pipeline_layout,
             &self.descriptor_sets,
+            self.indices.len() as u32
         );
     }
 
@@ -473,7 +505,6 @@ impl VulkanApp {
             self.device.destroy_image_view(self.depth_image_view, None);
             self.device.destroy_image(self.depth_image, None);
             self.device.free_memory(self.depth_image_memory, None);
-
 
             self.device
                 .free_command_buffers(self.command_pool, &self.command_buffers);
@@ -526,6 +557,7 @@ impl VulkanApp {
         _submit_queue: vk::Queue,
         swapchain_extent: vk::Extent2D,
         device_memory_properties: &vk::PhysicalDeviceMemoryProperties,
+        msaa_samples: vk::SampleCountFlags,
     ) -> (vk::Image, vk::ImageView, vk::DeviceMemory) {
         let depth_format = find_depth_format(instance, physical_device);
         let (depth_image, depth_image_memory) = create_image(
@@ -533,7 +565,7 @@ impl VulkanApp {
             swapchain_extent.width,
             swapchain_extent.height,
             1,
-            vk::SampleCountFlags::TYPE_1,
+            msaa_samples,
             depth_format,
             vk::ImageTiling::OPTIMAL,
             vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,

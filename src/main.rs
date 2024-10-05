@@ -29,7 +29,7 @@ use vk_rs::util::sync::create_sync_objects;
 use vk_rs::util::{find_depth_format, load_model};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalPosition, Position};
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, KeyCode, NamedKey};
 use winit::window::{CursorGrabMode, Window, WindowId};
@@ -252,6 +252,7 @@ impl VulkanApp {
                 Vec3::new(0.0, 0.0, 1.0),
                 swapchain_stuff.swapchain_extent.width as f32
                     / swapchain_stuff.swapchain_extent.height as f32,
+                45.0_f32.to_radians(),
             );
 
             let mut uniform_transform: UniformBufferObject = UniformBufferObject {
@@ -631,10 +632,20 @@ impl Drop for VulkanApp {
 }
 
 #[derive(Default)]
+struct UIState {
+    left_mouse_pressed: bool,
+    right_mouse_pressed: bool,
+    last_mouse_pos: winit::dpi::PhysicalPosition<f64>,
+}
+
+#[derive(Default)]
 struct App {
     window: Option<Arc<Window>>,
     vk: Option<VulkanApp>,
     timer: Option<FPSLimiter>,
+
+    //helper
+    state: UIState,
 }
 
 impl ApplicationHandler for App {
@@ -677,11 +688,30 @@ impl ApplicationHandler for App {
                 }
                 self.window.as_ref().unwrap().request_redraw();
             }
-            WindowEvent::KeyboardInput {
+            WindowEvent::MouseInput {
                 device_id,
-                event,
-                is_synthetic,
+                state,
+                button,
             } => {
+                if let MouseButton::Left = button {
+                    self.state.left_mouse_pressed = state.is_pressed();
+                }
+            }
+            WindowEvent::CursorMoved {
+                device_id,
+                position,
+            } => {
+                if self.state.left_mouse_pressed {
+                    // let camera = &mut self.vk.as_mut().unwrap().camera;
+                    // let (xoffset, yoffset) = (
+                    //     (position.x - self.state.last_mouse_pos.x),
+                    //     position.y - self.state.last_mouse_pos.y,
+                    // );
+                    // camera.process_mouse(xoffset as f32, yoffset as f32);
+                }
+                self.state.last_mouse_pos = position;
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
                     if let Key::Character(ch) = event.logical_key.as_ref() {
                         let vk = self.vk.as_mut().unwrap();

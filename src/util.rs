@@ -16,7 +16,6 @@ pub mod sampler;
 use std::{ffi::{c_char, CStr}, path::Path};
 
 use ash::vk::{self};
-use tobj::LoadOptions;
 
 use crate::structures::Vertex;
 

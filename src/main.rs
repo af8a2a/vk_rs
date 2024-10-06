@@ -702,12 +702,12 @@ impl ApplicationHandler for App {
                 position,
             } => {
                 if self.state.left_mouse_pressed {
-                    // let camera = &mut self.vk.as_mut().unwrap().camera;
-                    // let (xoffset, yoffset) = (
-                    //     (position.x - self.state.last_mouse_pos.x),
-                    //     position.y - self.state.last_mouse_pos.y,
-                    // );
-                    // camera.process_mouse(xoffset as f32, yoffset as f32);
+                    let camera = &mut self.vk.as_mut().unwrap().camera;
+                    let (xoffset, yoffset) = (
+                        (position.x - self.state.last_mouse_pos.x),
+                        position.y - self.state.last_mouse_pos.y,
+                    );
+                    camera.process_mouse(xoffset as f32, yoffset as f32);
                 }
                 self.state.last_mouse_pos = position;
             }

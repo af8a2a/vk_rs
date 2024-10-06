@@ -1,4 +1,4 @@
-use nalgebra_glm::Vec3;
+use nalgebra_glm::{vec3_to_vec4, Vec3};
 
 pub enum Direction {
     Forward,
@@ -40,13 +40,13 @@ impl Camera {
             movement_speed: 100.0,
             aspect,
             fov,
+            mouse_sensitivity: 0.05,
             ..Default::default()
         }
     }
 
     pub fn get_view_matrix(&self) -> nalgebra_glm::Mat4 {
         let view = nalgebra_glm::look_at(&self.position, &(self.position + self.front), &self.up);
-        // println!("view matrix: {:?}", view);
         view
     }
 
@@ -74,18 +74,25 @@ impl Camera {
         }
     }
     pub fn process_mouse(&mut self, xoffset: f32, yoffset: f32) {
-        let xoffset = xoffset * self.mouse_sensitivity;
-        let yoffset = -yoffset * self.mouse_sensitivity;
-        self.yaw += xoffset;
-        self.pitch += yoffset;
-        self.pitch = self.pitch.clamp(-89.0, 89.0);
+        let dx = (xoffset * self.mouse_sensitivity).to_radians();
+        let dy = (yoffset * self.mouse_sensitivity).to_radians();
+        self.pitch(dy);
+        self.rotate_y(dx);
+    }
 
-        self.front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
-        self.front.y = self.pitch.to_radians().sin();
-        self.front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
-        self.front = nalgebra_glm::normalize(&self.front);
-
-        self.right = nalgebra_glm::normalize(&nalgebra_glm::cross(&self.front, &self.world_up));
-        self.up = nalgebra_glm::normalize(&nalgebra_glm::cross(&self.right, &self.front));
+    fn pitch(&mut self, angle: f32) {
+        let rot = nalgebra_glm::rotate(&nalgebra_glm::Mat4x4::identity(), angle, &self.right);
+        self.up = rot.transform_vector(&self.up);
+        self.front = rot.transform_vector(&self.front);
+    }
+    fn rotate_y(&mut self, angle: f32) {
+        let rot = nalgebra_glm::rotate(
+            &nalgebra_glm::Mat4x4::identity(),
+            angle,
+            &nalgebra_glm::Vec3::z_axis(),
+        );
+        self.right = rot.transform_vector(&self.right);
+        self.up = rot.transform_vector(&self.up);
+        self.front = rot.transform_vector(&self.front);
     }
 }

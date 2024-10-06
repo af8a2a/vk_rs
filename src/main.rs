@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -333,7 +334,26 @@ impl VulkanApp {
 }
 
 impl VulkanApp {
-    fn draw_frame(&mut self, delta_time: f32) {
+    fn update_input(&mut self, input_state: &InputState, delta_time: f32) {
+        if input_state.keyboard_state.contains("w") {
+            self.camera.process_move(Direction::Forward, delta_time);
+        }
+
+        if input_state.keyboard_state.contains("a") {
+            self.camera.process_move(Direction::Left, delta_time);
+        }
+
+        if input_state.keyboard_state.contains("s") {
+            self.camera.process_move(Direction::Backward, delta_time);
+        }
+
+        if input_state.keyboard_state.contains("d") {
+            self.camera.process_move(Direction::Right, delta_time);
+        }
+    }
+
+    fn draw_frame(&mut self, input_state: &InputState, delta_time: f32) {
+        self.update_input(input_state, delta_time);
         let wait_fences = [self.in_flight_fences[self.current_frame]];
 
         unsafe {
@@ -632,10 +652,11 @@ impl Drop for VulkanApp {
 }
 
 #[derive(Default)]
-struct UIState {
+struct InputState {
     left_mouse_pressed: bool,
     right_mouse_pressed: bool,
     last_mouse_pos: winit::dpi::PhysicalPosition<f64>,
+    keyboard_state: HashSet<String>,
 }
 
 #[derive(Default)]
@@ -645,7 +666,7 @@ struct App {
     timer: Option<FPSLimiter>,
 
     //helper
-    state: UIState,
+    state: InputState,
 }
 
 impl ApplicationHandler for App {
@@ -684,7 +705,25 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 if self.vk.is_some() {
-                    self.vk.as_mut().unwrap().draw_frame(delta_time);
+                    let vk = self.vk.as_mut().unwrap();
+
+                    if self.state.keyboard_state.contains("w") {
+                        vk.camera.process_move(Direction::Forward, delta_time);
+                    }
+
+                    if self.state.keyboard_state.contains("a") {
+                        vk.camera.process_move(Direction::Left, delta_time);
+                    }
+
+                    if self.state.keyboard_state.contains("s") {
+                        vk.camera.process_move(Direction::Backward, delta_time);
+                    }
+
+                    if self.state.keyboard_state.contains("d") {
+                        vk.camera.process_move(Direction::Right, delta_time);
+                    }
+
+                    vk.draw_frame(&self.state, delta_time);
                 }
                 self.window.as_ref().unwrap().request_redraw();
             }
@@ -711,21 +750,18 @@ impl ApplicationHandler for App {
                 }
                 self.state.last_mouse_pos = position;
             }
-            WindowEvent::KeyboardInput { event, .. } => {
-                if event.state.is_pressed() {
+            WindowEvent::KeyboardInput { event, .. } => match event.state {
+                ElementState::Pressed => {
                     if let Key::Character(ch) = event.logical_key.as_ref() {
-                        let vk = self.vk.as_mut().unwrap();
-                        let ch = ch.to_uppercase();
-                        match ch.as_str() {
-                            "W" => vk.camera.process_move(Direction::Forward, delta_time),
-                            "S" => vk.camera.process_move(Direction::Backward, delta_time),
-                            "A" => vk.camera.process_move(Direction::Left, delta_time),
-                            "D" => vk.camera.process_move(Direction::Right, delta_time),
-                            _ => (),
-                        }
+                        self.state.keyboard_state.insert(ch.to_lowercase());
                     }
                 }
-            }
+                ElementState::Released => {
+                    if let Key::Character(ch) = event.logical_key.as_ref() {
+                        self.state.keyboard_state.remove(ch);
+                    }
+                }
+            },
             _ => (),
         }
         timer.tick_frame();

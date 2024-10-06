@@ -17,8 +17,6 @@ pub struct Camera {
 
     aspect: f32,
     fov: f32,
-    yaw: f32,
-    pitch: f32,
 
     movement_speed: f32,
     mouse_sensitivity: f32,
@@ -37,7 +35,7 @@ impl Camera {
             up,
             right: nalgebra_glm::normalize(&nalgebra_glm::cross(&front, &up)),
             world_up: *Vec3::z_axis(),
-            movement_speed: 100.0,
+            movement_speed: 1.0,
             aspect,
             fov,
             mouse_sensitivity: 0.05,
@@ -74,10 +72,14 @@ impl Camera {
         }
     }
     pub fn process_mouse(&mut self, xoffset: f32, yoffset: f32) {
-        let dx = (xoffset * self.mouse_sensitivity).to_radians();
-        let dy = (yoffset * self.mouse_sensitivity).to_radians();
+        let dx = (-xoffset * self.mouse_sensitivity).to_radians();
+        let dy = (-yoffset * self.mouse_sensitivity).to_radians();
         self.pitch(dy);
         self.rotate_y(dx);
+        self.front= nalgebra_glm::normalize(&self.front);
+        self.right = nalgebra_glm::normalize(&nalgebra_glm::cross(&self.front, &self.world_up));
+        self.up = nalgebra_glm::normalize(&nalgebra_glm::cross(&self.right, &self.front));
+
     }
 
     fn pitch(&mut self, angle: f32) {

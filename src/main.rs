@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -5,6 +6,7 @@ use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
 use ash::{vk, Entry};
 use nalgebra_glm::{look_at, perspective, Mat4x4, Vec3};
+use vk_rs::camera::{Camera, Direction};
 use vk_rs::structures::{QueueFamilyIndices, SurfaceStuff, UniformBufferObject, Vertex};
 use vk_rs::util::buffer::{copy_buffer, create_buffer, create_index_buffer, create_vertex_buffer};
 use vk_rs::util::command_buffer::{create_command_buffers, create_command_pool};
@@ -27,9 +29,11 @@ use vk_rs::util::swapchain::create_swapchain;
 use vk_rs::util::sync::create_sync_objects;
 use vk_rs::util::{find_depth_format, load_model};
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::dpi::{LogicalPosition, Position};
+use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{Window, WindowId};
+use winit::keyboard::{Key, KeyCode, NamedKey};
+use winit::window::{CursorGrabMode, Window, WindowId};
 
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 const TEXTURE_PATH: &'static str = "assets/chalet.jpg";
@@ -101,6 +105,7 @@ pub struct VulkanApp {
     is_framebuffer_resized: bool,
 
     window: Arc<Window>,
+    camera: Camera,
 }
 
 impl VulkanApp {
@@ -242,22 +247,22 @@ impl VulkanApp {
                 indices.len() as u32,
             );
             let sync_ojbects = create_sync_objects(&device, MAX_FRAMES_IN_FLIGHT);
-            let mut uniform_transform=UniformBufferObject {
-                model: Mat4x4::identity(),
-                view: look_at(
-                    &Vec3::new(2.0, 2.0, 2.0),
-                    &Vec3::new(0.0, 0.0, 0.0),
-                    &Vec3::new(0.0, 0.0, 1.0),
-                ),
-                proj: perspective(
-                    swapchain_stuff.swapchain_extent.width as f32
-                        / swapchain_stuff.swapchain_extent.height as f32,
-                    45.0_f32.to_radians(),
-                    0.1,
-                    10.0,
-                ),
+            let camera = Camera::new(
+                Vec3::new(2.0, 5.0, 2.0),
+                -Vec3::new(2.0, 5.0, 2.0),
+                Vec3::new(0.0, 0.0, 1.0),
+                swapchain_stuff.swapchain_extent.width as f32
+                    / swapchain_stuff.swapchain_extent.height as f32,
+                45.0_f32.to_radians(),
+            );
+
+            let mut uniform_transform: UniformBufferObject = UniformBufferObject {
+                model: camera.get_model(),
+                view: camera.get_view_matrix(),
+                proj: camera.get_perspective_projection_matrix(),
             };
-            *uniform_transform.proj.index_mut((1,1))*=-1.0;
+            *uniform_transform.proj.index_mut((1, 1)) *= -1.0;
+
             Self {
                 entry,
                 instance,
@@ -321,14 +326,34 @@ impl VulkanApp {
                 vertices,
                 indices,
 
-                memory_properties: physical_device_memory_properties
+                memory_properties: physical_device_memory_properties,
+                camera,
             }
         }
     }
 }
 
 impl VulkanApp {
-    fn draw_frame(&mut self, delta_time: f32) {
+    fn update_input(&mut self, input_state: &InputState, delta_time: f32) {
+        if input_state.keyboard_state.contains("w") {
+            self.camera.process_move(Direction::Forward, delta_time);
+        }
+
+        if input_state.keyboard_state.contains("a") {
+            self.camera.process_move(Direction::Left, delta_time);
+        }
+
+        if input_state.keyboard_state.contains("s") {
+            self.camera.process_move(Direction::Backward, delta_time);
+        }
+
+        if input_state.keyboard_state.contains("d") {
+            self.camera.process_move(Direction::Right, delta_time);
+        }
+    }
+
+    fn draw_frame(&mut self, input_state: &InputState, delta_time: f32) {
+        self.update_input(input_state, delta_time);
         let wait_fences = [self.in_flight_fences[self.current_frame]];
 
         unsafe {
@@ -459,7 +484,6 @@ impl VulkanApp {
         self.graphics_pipeline = graphics_pipeline;
         self.pipeline_layout = pipeline_layout;
 
-
         let depth_resources = Self::create_depth_resources(
             &self.instance,
             &self.device,
@@ -474,7 +498,6 @@ impl VulkanApp {
         self.depth_image_view = depth_resources.1;
         self.depth_image_memory = depth_resources.2;
 
-
         self.swapchain_framebuffers = create_framebuffers(
             &self.device,
             self.render_pass,
@@ -482,8 +505,6 @@ impl VulkanApp {
             self.depth_image_view,
             self.swapchain_extent,
         );
-
-
 
         self.command_buffers = create_command_buffers(
             &self.device,
@@ -496,7 +517,7 @@ impl VulkanApp {
             self.index_buffer,
             self.pipeline_layout,
             &self.descriptor_sets,
-            self.indices.len() as u32
+            self.indices.len() as u32,
         );
     }
 
@@ -524,9 +545,8 @@ impl VulkanApp {
     }
 
     fn update_uniform_buffer(&mut self, current_image: usize, delta_time: f32) {
-        self.uniform_transform.model =
-            Mat4x4::from_axis_angle(&Vec3::z_axis(), 1.0_f32 * delta_time)
-                * self.uniform_transform.model;
+        self.uniform_transform.view = self.camera.get_view_matrix();
+        self.uniform_transform.model = self.camera.get_model();
         let ubos = [self.uniform_transform.clone()];
 
         let buffer_size = (std::mem::size_of::<UniformBufferObject>() * ubos.len()) as u64;
@@ -632,10 +652,21 @@ impl Drop for VulkanApp {
 }
 
 #[derive(Default)]
+struct InputState {
+    left_mouse_pressed: bool,
+    right_mouse_pressed: bool,
+    last_mouse_pos: winit::dpi::PhysicalPosition<f64>,
+    keyboard_state: HashSet<String>,
+}
+
+#[derive(Default)]
 struct App {
     window: Option<Arc<Window>>,
     vk: Option<VulkanApp>,
     timer: Option<FPSLimiter>,
+
+    //helper
+    state: InputState,
 }
 
 impl ApplicationHandler for App {
@@ -645,6 +676,9 @@ impl ApplicationHandler for App {
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
+        // window.set_cursor_visible(false);
+        // window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+        window.focus_window();
         self.vk = Some(VulkanApp::new(window.clone()));
         self.window = Some(window);
         self.timer = Some(FPSLimiter::new());
@@ -652,23 +686,85 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // println!("extend2d:{:#?}", self.vk.as_ref().unwrap().surface_resolution);
+        let timer = self.timer.as_mut().unwrap();
+        let delta_time = timer.delta_time();
+
         match event {
-            WindowEvent::CloseRequested => {
+            WindowEvent::CloseRequested
+            | WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        logical_key: Key::Named(NamedKey::Escape),
+                        ..
+                    },
+                ..
+            } => {
                 println!("The close button was pressed; stopping");
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
                 if self.vk.is_some() {
-                    let timer = self.timer.as_mut().unwrap();
-                    let delta_time = timer.delta_time();
+                    let vk = self.vk.as_mut().unwrap();
 
-                    self.vk.as_mut().unwrap().draw_frame(delta_time);
-                    timer.tick_frame();
+                    if self.state.keyboard_state.contains("w") {
+                        vk.camera.process_move(Direction::Forward, delta_time);
+                    }
+
+                    if self.state.keyboard_state.contains("a") {
+                        vk.camera.process_move(Direction::Left, delta_time);
+                    }
+
+                    if self.state.keyboard_state.contains("s") {
+                        vk.camera.process_move(Direction::Backward, delta_time);
+                    }
+
+                    if self.state.keyboard_state.contains("d") {
+                        vk.camera.process_move(Direction::Right, delta_time);
+                    }
+
+                    vk.draw_frame(&self.state, delta_time);
                 }
                 self.window.as_ref().unwrap().request_redraw();
             }
+            WindowEvent::MouseInput {
+                device_id,
+                state,
+                button,
+            } => {
+                if let MouseButton::Left = button {
+                    self.state.left_mouse_pressed = state.is_pressed();
+                }
+            }
+            WindowEvent::CursorMoved {
+                device_id,
+                position,
+            } => {
+                if self.state.left_mouse_pressed {
+                    let camera = &mut self.vk.as_mut().unwrap().camera;
+                    let (xoffset, yoffset) = (
+                        (position.x - self.state.last_mouse_pos.x),
+                        position.y - self.state.last_mouse_pos.y,
+                    );
+                    camera.process_mouse(xoffset as f32, yoffset as f32);
+                }
+                self.state.last_mouse_pos = position;
+            }
+            WindowEvent::KeyboardInput { event, .. } => match event.state {
+                ElementState::Pressed => {
+                    if let Key::Character(ch) = event.logical_key.as_ref() {
+                        self.state.keyboard_state.insert(ch.to_lowercase());
+                    }
+                }
+                ElementState::Released => {
+                    if let Key::Character(ch) = event.logical_key.as_ref() {
+                        self.state.keyboard_state.remove(ch);
+                    }
+                }
+            },
             _ => (),
         }
+        timer.tick_frame();
     }
 }
 

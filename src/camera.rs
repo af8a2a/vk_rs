@@ -1,4 +1,4 @@
-use nalgebra_glm::{vec3_to_vec4, Vec3};
+use nalgebra_glm::{quat_rotate_vec3, quat_rotation, vec3_to_vec4, Vec3};
 
 pub enum Direction {
     Forward,
@@ -55,7 +55,9 @@ impl Camera {
         mat
     }
     pub fn get_perspective_projection_matrix(&self) -> nalgebra_glm::Mat4 {
-        nalgebra_glm::perspective(self.aspect, self.fov, 0.1, 100.0)
+        let mut proj=nalgebra_glm::perspective(self.aspect, self.fov, 0.1, 100.0);
+        *proj.index_mut((1, 1)) *= -1.0;
+        proj
     }
 
     pub fn get_orthogonal_projection_matrix(&self) -> nalgebra_glm::Mat4 {
@@ -72,29 +74,18 @@ impl Camera {
         }
     }
     pub fn process_mouse(&mut self, xoffset: f32, yoffset: f32) {
-        let dx = (-xoffset * self.mouse_sensitivity).to_radians();
-        let dy = (-yoffset * self.mouse_sensitivity).to_radians();
-        self.pitch(dy);
-        self.rotate_y(dx);
-        self.front= nalgebra_glm::normalize(&self.front);
-        self.right = nalgebra_glm::normalize(&nalgebra_glm::cross(&self.front, &self.world_up));
-        self.up = nalgebra_glm::normalize(&nalgebra_glm::cross(&self.right, &self.front));
+        let dx = -(xoffset * self.mouse_sensitivity).to_radians();
+        let dy = -(yoffset * self.mouse_sensitivity).to_radians();
 
+        self.translate_quaternion(dx, dy);
     }
 
-    fn pitch(&mut self, angle: f32) {
-        let rot = nalgebra_glm::rotate(&nalgebra_glm::Mat4x4::identity(), angle, &self.right);
-        self.up = rot.transform_vector(&self.up);
-        self.front = rot.transform_vector(&self.front);
+    fn translate_quaternion(&mut self, dx: f32, dy: f32) {
+        let q_yaw = nalgebra_glm::quat_angle_axis(dx, &Vec3::z_axis());
+        let q_pitch = nalgebra_glm::quat_angle_axis(dy, &(self.right));
+        self.front = quat_rotate_vec3(&(q_yaw * q_pitch), &self.front);
+        self.right = quat_rotate_vec3(&(q_yaw * q_pitch), &self.right);
+        self.up = -self.front.cross(&self.right);
     }
-    fn rotate_y(&mut self, angle: f32) {
-        let rot = nalgebra_glm::rotate(
-            &nalgebra_glm::Mat4x4::identity(),
-            angle,
-            &nalgebra_glm::Vec3::z_axis(),
-        );
-        self.right = rot.transform_vector(&self.right);
-        self.up = rot.transform_vector(&self.up);
-        self.front = rot.transform_vector(&self.front);
-    }
+
 }

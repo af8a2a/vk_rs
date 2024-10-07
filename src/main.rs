@@ -261,7 +261,7 @@ impl VulkanApp {
                 view: camera.get_view_matrix(),
                 proj: camera.get_perspective_projection_matrix(),
             };
-            *uniform_transform.proj.index_mut((1, 1)) *= -1.0;
+            // *uniform_transform.proj.index_mut((1, 1)) *= -1.0;
 
             Self {
                 entry,

@@ -203,7 +203,7 @@ pub fn create_texture_image(
         vk::Format::R8G8B8A8_UNORM,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-        1
+        1,
     );
 
     unsafe {
@@ -212,6 +212,29 @@ pub fn create_texture_image(
     }
 
     (texture_image, texture_image_memory)
+}
+
+pub fn load_cubemap(
+    device: &ash::Device,
+    command_pool: vk::CommandPool,
+    submit_queue: vk::Queue,
+    device_memory_properties: &vk::PhysicalDeviceMemoryProperties,
+    dir_path: &Path,
+) -> Vec<(vk::Image, vk::DeviceMemory)> {
+    let dir = std::fs::read_dir(dir_path).expect("Failed to read directory");
+    let mut images: Vec<(vk::Image, vk::DeviceMemory)> = Vec::new();
+    for entry in dir {
+        let path = entry.unwrap().path();
+        let image = create_texture_image(
+            device,
+            command_pool,
+            submit_queue,
+            device_memory_properties,
+            &path,
+        );
+        images.push(image);
+    }
+    images
 }
 
 fn transition_image_layout(

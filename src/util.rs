@@ -8,12 +8,15 @@ pub mod framebuffer;
 pub mod image;
 pub mod instance;
 pub mod pipeline;
+pub mod sampler;
 pub mod surface;
 pub mod swapchain;
 pub mod sync;
-pub mod sampler;
 
-use std::{ffi::{c_char, CStr}, path::Path};
+use std::{
+    ffi::{c_char, CStr},
+    path::Path,
+};
 
 use ash::vk::{self};
 
@@ -102,7 +105,6 @@ pub fn find_memory_type(
     panic!("Failed to find suitable memory type!")
 }
 
-
 pub fn find_depth_format(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
@@ -144,10 +146,10 @@ fn find_supported_format(
     panic!("Failed to find supported format!")
 }
 
-
 pub fn load_model(model_path: &Path) -> (Vec<Vertex>, Vec<u32>) {
-    let model_obj = tobj::load_obj(model_path,&tobj::GPU_LOAD_OPTIONS).expect("Failed to load model object!");
-    
+    let model_obj =
+        tobj::load_obj(model_path, &tobj::GPU_LOAD_OPTIONS).expect("Failed to load model object!");
+
     let mut vertices = vec![];
     let mut indices = vec![];
 
@@ -179,3 +181,4 @@ pub fn load_model(model_path: &Path) -> (Vec<Vertex>, Vec<u32>) {
 
     (vertices, indices)
 }
+

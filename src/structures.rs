@@ -95,3 +95,14 @@ pub struct SwapChainSupportDetail {
     pub formats: Vec<vk::SurfaceFormatKHR>,
     pub present_modes: Vec<vk::PresentModeKHR>,
 }
+
+
+
+
+#[derive(Default)]
+pub struct InputState {
+   pub left_mouse_pressed: bool,
+   pub right_mouse_pressed: bool,
+   pub last_mouse_pos: winit::dpi::PhysicalPosition<f64>,
+   pub keyboard_state: std::collections::HashSet<String>,
+}

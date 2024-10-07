@@ -1,4 +1,4 @@
-use nalgebra_glm::{quat_rotate_vec3, quat_rotation, vec3_to_vec4, Vec3};
+use nalgebra_glm::{quat_rotate_vec3, Vec3};
 
 pub enum Direction {
     Forward,

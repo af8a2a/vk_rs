@@ -1,6 +1,5 @@
 use ash::vk;
 
-use crate::structures::UniformBufferObject;
 
 use super::buffer::create_buffer;
 
@@ -31,7 +30,7 @@ pub fn create_descriptor_pool(
     }
 }
 
-pub fn create_descriptor_sets(
+pub fn create_descriptor_sets<T>(
     device: &ash::Device,
     descriptor_pool: vk::DescriptorPool,
     descriptor_set_layout: vk::DescriptorSetLayout,
@@ -59,7 +58,7 @@ pub fn create_descriptor_sets(
         let descriptor_buffer_info = [vk::DescriptorBufferInfo {
             buffer: uniforms_buffers[i],
             offset: 0,
-            range: std::mem::size_of::<UniformBufferObject>() as u64,
+            range: std::mem::size_of::<T>() as u64,
         }];
         let descriptor_image_infos = [vk::DescriptorImageInfo {
             sampler: texture_sampler,
@@ -114,12 +113,12 @@ pub fn create_descriptor_set_layout(device: &ash::Device) -> vk::DescriptorSetLa
     }
 }
 
-pub fn create_uniform_buffers(
+pub fn create_uniform_buffers<T>(
     device: &ash::Device,
     device_memory_properties: &vk::PhysicalDeviceMemoryProperties,
     swapchain_image_count: usize,
 ) -> (Vec<vk::Buffer>, Vec<vk::DeviceMemory>) {
-    let buffer_size = std::mem::size_of::<UniformBufferObject>();
+    let buffer_size = std::mem::size_of::<T>();
 
     let mut uniform_buffers = vec![];
     let mut uniform_buffers_memory = vec![];

@@ -72,15 +72,7 @@ pub fn create_command_pool(
 pub fn create_command_buffers(
     device: &ash::Device,
     command_pool: vk::CommandPool,
-    graphics_pipeline: vk::Pipeline,
     framebuffers: &Vec<vk::Framebuffer>,
-    render_pass: vk::RenderPass,
-    surface_extent: vk::Extent2D,
-    vertex_buffer: vk::Buffer,
-    index_buffer: vk::Buffer,
-    pipeline_layout: vk::PipelineLayout,
-    descriptor_sets: &Vec<vk::DescriptorSet>,
-    index_count: u32,
 ) -> Vec<vk::CommandBuffer> {
     let command_buffer_allocate_info = vk::CommandBufferAllocateInfo::default()
         .command_pool(command_pool)
@@ -93,75 +85,6 @@ pub fn create_command_buffers(
             .expect("Failed to allocate Command Buffers!")
     };
 
-    for (i, &command_buffer) in command_buffers.iter().enumerate() {
-        let command_buffer_begin_info = vk::CommandBufferBeginInfo::default()
-            .flags(vk::CommandBufferUsageFlags::SIMULTANEOUS_USE);
-        unsafe {
-            device
-                .begin_command_buffer(command_buffer, &command_buffer_begin_info)
-                .expect("Failed to begin recording Command Buffer at beginning!");
-        }
-
-        let clear_values = [
-            vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0],
-                },
-            },
-            vk::ClearValue {
-                // clear value for depth buffer
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
-            },
-        ];
-
-        let render_pass_begin_info = vk::RenderPassBeginInfo::default()
-            .render_pass(render_pass)
-            .framebuffer(framebuffers[i])
-            .clear_values(&clear_values)
-            .render_area(vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: surface_extent,
-            });
-
-        unsafe {
-            device.cmd_begin_render_pass(
-                command_buffer,
-                &render_pass_begin_info,
-                vk::SubpassContents::INLINE,
-            );
-
-            device.cmd_bind_pipeline(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                graphics_pipeline,
-            );
-            let vertex_buffers = [vertex_buffer];
-            let offsets = [0_u64];
-            let descriptor_sets_to_bind = [descriptor_sets[i]];
-
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
-            device.cmd_bind_index_buffer(command_buffer, index_buffer, 0, vk::IndexType::UINT32);
-            device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline_layout,
-                0,
-                &descriptor_sets_to_bind,
-                &[],
-            );
-
-            device.cmd_draw_indexed(command_buffer, index_count, 1, 0, 0, 0);
-
-            device.cmd_end_render_pass(command_buffer);
-
-            device
-                .end_command_buffer(command_buffer)
-                .expect("Failed to record Command Buffer at Ending!");
-        }
-    }
 
     command_buffers
 }

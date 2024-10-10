@@ -1,11 +1,9 @@
-use std::{ffi::CString, io::Cursor};
 
 use ash::{
     util::read_spv,
     vk::{self, PipelineLayoutCreateInfo},
 };
 
-use crate::structures::Vertex;
 
 use super::find_depth_format;
 
@@ -82,137 +80,136 @@ pub fn create_render_pass(
 
 pub fn create_graphics_pipeline(
     device: &ash::Device,
-    render_pass: vk::RenderPass,
-    swapchain_extent: vk::Extent2D,
-    ubo_set_layout: vk::DescriptorSetLayout,
-) -> (vk::Pipeline, vk::PipelineLayout) {
-    let mut vertex_spv_file = Cursor::new(&include_bytes!("../../shader/depth/depth.vert.spv")[..]);
-    let mut frag_spv_file = Cursor::new(&include_bytes!("../../shader/depth/depth.frag.spv")[..]);
+    graphic_pipeline_create_infos: &[vk::GraphicsPipelineCreateInfo],
+) -> vk::Pipeline {
+    // let mut vertex_spv_file = Cursor::new(&include_bytes!("../../shader/depth/depth.vert.spv")[..]);
+    // let mut frag_spv_file = Cursor::new(&include_bytes!("../../shader/depth/depth.frag.spv")[..]);
 
-    let vertex_code =
-        read_spv(&mut vertex_spv_file).expect("Failed to read vertex shader spv file");
-    let frag_code = read_spv(&mut frag_spv_file).expect("Failed to read fragment shader spv file");
+    // let vertex_code: Vec<u32> =
+    //     read_spv(&mut vertex_spv_file).expect("Failed to read vertex shader spv file");
+    // let frag_code = read_spv(&mut frag_spv_file).expect("Failed to read fragment shader spv file");
 
-    let vert_shader_module = create_shader_module(device, vertex_code);
-    let frag_shader_module = create_shader_module(device, frag_code);
+    // let vert_shader_module = create_shader_module(device, vertex_code);
+    // let frag_shader_module = create_shader_module(device, frag_code);
 
-    let main_function_name = CString::new("main").unwrap(); // the beginning function name in shader code.
+    // let main_function_name = CString::new("main").unwrap(); // the beginning function name in shader code.
 
-    let shader_stages = [
-        vk::PipelineShaderStageCreateInfo {
-            module: vert_shader_module,
-            p_name: main_function_name.as_ptr(),
-            stage: vk::ShaderStageFlags::VERTEX,
-            ..Default::default()
-        },
-        vk::PipelineShaderStageCreateInfo {
-            module: frag_shader_module,
-            p_name: main_function_name.as_ptr(),
-            stage: vk::ShaderStageFlags::FRAGMENT,
-            ..Default::default()
-        },
-    ];
+    // let shader_stages = [
+    //     vk::PipelineShaderStageCreateInfo {
+    //         module: vert_shader_module,
+    //         p_name: main_function_name.as_ptr(),
+    //         stage: vk::ShaderStageFlags::VERTEX,
+    //         ..Default::default()
+    //     },
+    //     vk::PipelineShaderStageCreateInfo {
+    //         module: frag_shader_module,
+    //         p_name: main_function_name.as_ptr(),
+    //         stage: vk::ShaderStageFlags::FRAGMENT,
+    //         ..Default::default()
+    //     },
+    // ];
 
-    let binding_description = Vertex::get_binding_descriptions();
-    let attribute_description = Vertex::get_attribute_descriptions();
+    // let binding_description = Vertex::get_binding_descriptions();
+    // let attribute_description = Vertex::get_attribute_descriptions();
 
-    let vertex_input_state_create_info = vk::PipelineVertexInputStateCreateInfo::default()
-        .vertex_attribute_descriptions(&attribute_description)
-        .vertex_binding_descriptions(&binding_description);
-    let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
-        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
-        ..Default::default()
-    };
+    // let vertex_input_state_create_info = vk::PipelineVertexInputStateCreateInfo::default()
+    //     .vertex_attribute_descriptions(&attribute_description)
+    //     .vertex_binding_descriptions(&binding_description);
 
-    let viewports = [vk::Viewport {
-        x: 0.0,
-        y: 0.0,
-        width: swapchain_extent.width as f32,
-        height: swapchain_extent.height as f32,
-        min_depth: 0.0,
-        max_depth: 1.0,
-    }];
+    // let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
+    //     topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+    //     ..Default::default()
+    // };
 
-    let scissors = [vk::Rect2D {
-        offset: vk::Offset2D { x: 0, y: 0 },
-        extent: swapchain_extent,
-    }];
+    // let viewports = [vk::Viewport {
+    //     x: 0.0,
+    //     y: 0.0,
+    //     width: swapchain_extent.width as f32,
+    //     height: swapchain_extent.height as f32,
+    //     min_depth: 0.0,
+    //     max_depth: 1.0,
+    // }];
 
-    let viewport_state_info = vk::PipelineViewportStateCreateInfo::default()
-        .scissors(&scissors)
-        .viewports(&viewports);
+    // let scissors = [vk::Rect2D {
+    //     offset: vk::Offset2D { x: 0, y: 0 },
+    //     extent: swapchain_extent,
+    // }];
 
-    let rasterization_statue_create_info = vk::PipelineRasterizationStateCreateInfo {
-        front_face: vk::FrontFace::COUNTER_CLOCKWISE,
-        line_width: 1.0,
-        polygon_mode: vk::PolygonMode::FILL,
-        ..Default::default()
-    };
+    // let viewport_state_info = vk::PipelineViewportStateCreateInfo::default()
+    //     .scissors(&scissors)
+    //     .viewports(&viewports);
 
-    let multisample_state_create_info = vk::PipelineMultisampleStateCreateInfo {
-        rasterization_samples: vk::SampleCountFlags::TYPE_1,
-        ..Default::default()
-    };
+    // let rasterization_statue_create_info = vk::PipelineRasterizationStateCreateInfo {
+    //     front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+    //     line_width: 1.0,
+    //     polygon_mode: vk::PolygonMode::FILL,
+    //     ..Default::default()
+    // };
 
-    let stencil_state = vk::StencilOpState {
-        fail_op: vk::StencilOp::KEEP,
-        pass_op: vk::StencilOp::KEEP,
-        depth_fail_op: vk::StencilOp::KEEP,
-        compare_op: vk::CompareOp::ALWAYS,
-        ..Default::default()
-    };
+    // let multisample_state_create_info = vk::PipelineMultisampleStateCreateInfo {
+    //     rasterization_samples: vk::SampleCountFlags::TYPE_1,
+    //     ..Default::default()
+    // };
 
-    let depth_state_create_info = vk::PipelineDepthStencilStateCreateInfo {
-        depth_test_enable: 1,
-        depth_write_enable: 1,
-        depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
-        depth_bounds_test_enable: 0,
-        stencil_test_enable: 0,
-        front: stencil_state,
-        back: stencil_state,
-        min_depth_bounds: 0.0,
-        max_depth_bounds: 1.0,
-        ..Default::default()
-    };
+    // let stencil_state = vk::StencilOpState {
+    //     fail_op: vk::StencilOp::KEEP,
+    //     pass_op: vk::StencilOp::KEEP,
+    //     depth_fail_op: vk::StencilOp::KEEP,
+    //     compare_op: vk::CompareOp::ALWAYS,
+    //     ..Default::default()
+    // };
 
-    let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
-        blend_enable: 0,
-        src_color_blend_factor: vk::BlendFactor::ONE,
-        dst_color_blend_factor: vk::BlendFactor::ZERO,
-        color_blend_op: vk::BlendOp::ADD,
-        src_alpha_blend_factor: vk::BlendFactor::ONE,
-        dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-        alpha_blend_op: vk::BlendOp::ADD,
-        color_write_mask: vk::ColorComponentFlags::RGBA,
-    }];
+    // let depth_state_create_info = vk::PipelineDepthStencilStateCreateInfo {
+    //     depth_test_enable: 1,
+    //     depth_write_enable: 1,
+    //     depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+    //     depth_bounds_test_enable: 0,
+    //     stencil_test_enable: 0,
+    //     front: stencil_state,
+    //     back: stencil_state,
+    //     min_depth_bounds: 0.0,
+    //     max_depth_bounds: 1.0,
+    //     ..Default::default()
+    // };
 
-    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
-        .logic_op(vk::LogicOp::COPY)
-        .logic_op_enable(false)
-        .attachments(&color_blend_attachment_states)
-        .blend_constants([0.0, 0.0, 0.0, 0.0]);
+    // let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
+    //     blend_enable: 0,
+    //     src_color_blend_factor: vk::BlendFactor::ONE,
+    //     dst_color_blend_factor: vk::BlendFactor::ZERO,
+    //     color_blend_op: vk::BlendOp::ADD,
+    //     src_alpha_blend_factor: vk::BlendFactor::ONE,
+    //     dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+    //     alpha_blend_op: vk::BlendOp::ADD,
+    //     color_write_mask: vk::ColorComponentFlags::RGBA,
+    // }];
 
-    let set_layouts = [ubo_set_layout];
-    let pipeline_layout_create_info = PipelineLayoutCreateInfo::default().set_layouts(&set_layouts);
+    // let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
+    //     .logic_op(vk::LogicOp::COPY)
+    //     .logic_op_enable(false)
+    //     .attachments(&color_blend_attachment_states)
+    //     .blend_constants([0.0, 0.0, 0.0, 0.0]);
 
-    let pipeline_layout = unsafe {
-        device
-            .create_pipeline_layout(&pipeline_layout_create_info, None)
-            .expect("Failed to create pipeline layout!")
-    };
+    // let set_layouts = [ubo_set_layout];
+    // let pipeline_layout_create_info = PipelineLayoutCreateInfo::default().set_layouts(&set_layouts);
 
-    let graphic_pipeline_create_infos = [vk::GraphicsPipelineCreateInfo::default()
-        .stages(&shader_stages)
-        .vertex_input_state(&vertex_input_state_create_info)
-        .input_assembly_state(&vertex_input_assembly_state_info)
-        .viewport_state(&viewport_state_info)
-        .rasterization_state(&rasterization_statue_create_info)
-        .multisample_state(&multisample_state_create_info)
-        .depth_stencil_state(&depth_state_create_info)
-        .color_blend_state(&color_blend_state)
-        .layout(pipeline_layout)
-        .render_pass(render_pass)
-        .base_pipeline_index(-1)];
+    // let pipeline_layout = unsafe {
+    //     device
+    //         .create_pipeline_layout(&pipeline_layout_create_info, None)
+    //         .expect("Failed to create pipeline layout!")
+    // };
+
+    // let graphic_pipeline_create_infos = [vk::GraphicsPipelineCreateInfo::default()
+    //     .stages(&shader_stages)
+    //     .vertex_input_state(&vertex_input_state_create_info)
+    //     .input_assembly_state(&vertex_input_assembly_state_info)
+    //     .viewport_state(&viewport_state_info)
+    //     .rasterization_state(&rasterization_statue_create_info)
+    //     .multisample_state(&multisample_state_create_info)
+    //     .depth_stencil_state(&depth_state_create_info)
+    //     .color_blend_state(&color_blend_state)
+    //     .layout(pipeline_layout)
+    //     .render_pass(render_pass)
+    //     .base_pipeline_index(-1)];
 
     let graphics_pipelines = unsafe {
         device
@@ -224,12 +221,12 @@ pub fn create_graphics_pipeline(
             .expect("Failed to create Graphics Pipeline!.")
     };
 
-    unsafe {
-        device.destroy_shader_module(vert_shader_module, None);
-        device.destroy_shader_module(frag_shader_module, None);
-    }
+    // unsafe {
+    //     device.destroy_shader_module(vert_shader_module, None);
+    //     device.destroy_shader_module(frag_shader_module, None);
+    // }
 
-    (graphics_pipelines[0], pipeline_layout)
+    graphics_pipelines[0]
 }
 
 pub fn create_shader_module(device: &ash::Device, code: Vec<u32>) -> vk::ShaderModule {
@@ -240,3 +237,25 @@ pub fn create_shader_module(device: &ash::Device, code: Vec<u32>) -> vk::ShaderM
             .expect("Failed to create Shader Module!")
     }
 }
+
+pub fn create_pipeline_layout(
+    device: &ash::Device,
+    ubo_set_layout: &vk::DescriptorSetLayout,
+) -> vk::PipelineLayout {
+    let set_layouts = [*ubo_set_layout];
+    let pipeline_layout_create_info = PipelineLayoutCreateInfo::default().set_layouts(&set_layouts);
+
+    let pipeline_layout = unsafe {
+        device
+            .create_pipeline_layout(&pipeline_layout_create_info, None)
+            .expect("Failed to create pipeline layout!")
+    };
+    pipeline_layout
+}
+
+pub fn load_spirv(path: &str) -> Vec<u32> {
+    let mut file = std::fs::File::open(path).expect("Failed to open file");
+    let spirv_code = read_spv(&mut file).expect("Failed to read vertex shader spv file");
+    spirv_code
+}
+

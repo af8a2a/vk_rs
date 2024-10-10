@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ash::vk;
 
 use crate::{structures::{QueueFamilyIndices, SurfaceStuff}, util::vk_ptr_to_string};
@@ -138,7 +140,7 @@ pub fn create_logical_device(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
     surface_stuff: &SurfaceStuff,
-) -> (ash::Device, QueueFamilyIndices) {
+) -> (Arc<ash::Device>, QueueFamilyIndices) {
     let indices = find_queue_family(instance, physical_device, surface_stuff);
 
     use std::collections::HashSet;
@@ -174,6 +176,6 @@ pub fn create_logical_device(
             .expect("Failed to create logical Device!")
     };
 
-    (device, indices)
+    (Arc::new(device), indices)
 }
 

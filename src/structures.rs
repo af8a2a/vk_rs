@@ -1,7 +1,8 @@
 use std::mem::offset_of;
 
 use ash::vk;
-use nalgebra_glm::Mat4x4;
+
+use crate::base::VulkanBase;
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
@@ -44,13 +45,6 @@ impl Vertex {
 }
 
 
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct UniformBufferObject {
-    pub model: Mat4x4,
-    pub view: Mat4x4,
-    pub proj: Mat4x4,
-}
 
 pub struct SyncObjects {
     pub image_available_semaphores: Vec<vk::Semaphore>,
@@ -96,13 +90,26 @@ pub struct SwapChainSupportDetail {
     pub present_modes: Vec<vk::PresentModeKHR>,
 }
 
-
-
-
 #[derive(Default)]
 pub struct InputState {
-   pub left_mouse_pressed: bool,
-   pub right_mouse_pressed: bool,
-   pub last_mouse_pos: winit::dpi::PhysicalPosition<f64>,
-   pub keyboard_state: std::collections::HashSet<String>,
+    pub left_mouse_pressed: bool,
+    pub right_mouse_pressed: bool,
+    pub last_mouse_pos: winit::dpi::PhysicalPosition<f64>,
+    pub keyboard_state: std::collections::HashSet<String>,
+}
+
+pub trait RenderResource {
+    fn vertex_buffer(&self) -> vk::Buffer;
+    fn index_buffer(&self) -> vk::Buffer;
+    fn vertex_count(&self) -> u32;
+    fn index_count(&self) -> u32;
+    fn command_buffers(&self) -> &[vk::CommandBuffer];
+    fn fetch_command_buffer(&self, index: usize) -> &vk::CommandBuffer;
+}
+
+pub trait RenderState {
+    fn update_uniform_buffer(&mut self, current_image: usize, delta_time: f32);
+    fn update_input(&mut self, input_state: &InputState, delta_time: f32);
+    fn record_command_buffer(&mut self, resoultion: vk::Extent2D);
+    fn recreate(&mut self,vk: &VulkanBase);
 }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::structures::{InputState, RenderResource, RenderState};
 use crate::structures::{QueueFamilyIndices, SurfaceStuff};
-use crate::util::command_buffer::{create_command_pool, record_submit_commandbuffer};
+use crate::util::command_buffer::create_command_pool;
 use crate::util::debug::setup_debug_utils;
 use crate::util::descriptor::create_descriptor_pool;
 use crate::util::device::{create_logical_device, pick_physical_device};
@@ -203,21 +203,17 @@ impl VulkanBase {
 
         resource.update_uniform_buffer(image_index as usize, delta_time);
 
-        record_submit_commandbuffer(
-            &self.device,
-            *resource.fetch_command_buffer(self.current_frame),
-            wait_fences[0],
-            self.graphics_queue,
-            &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT],
-            &*self.image_available_semaphores,
-            &self.render_finished_semaphores,
-            resource.record_command_buffer(),
-        );
-        
-
         let wait_semaphores = [self.image_available_semaphores[self.current_frame]];
         let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let signal_semaphores = [self.render_finished_semaphores[self.current_frame]];
+
+        unsafe {
+            self.device
+                .wait_for_fences(&self.in_flight_fences, true, u64::MAX)
+                .expect("Wait for fence failed.");
+        }
+
+        resource.record_command_buffer(self.swapchain_extent);
 
         let binding = [*resource.fetch_command_buffer(image_index as usize)];
         let submit_infos = [vk::SubmitInfo::default()

@@ -39,8 +39,6 @@ struct VulkanResource {
     //ref
     device: Arc<ash::Device>,
     command_pool: vk::CommandPool,
-    resoultion: vk::Extent2D,
-
     //pipeline
     pub render_pass: vk::RenderPass,
     pub ubo_layout: vk::DescriptorSetLayout,
@@ -163,87 +161,84 @@ impl RenderState for VulkanResource {
         }
     }
 
-    fn record_command_buffer(&mut self) -> impl Fn() -> () {
-        let record=||{
-            for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
-                let command_buffer_begin_info = vk::CommandBufferBeginInfo::default()
-                    .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-                unsafe {
-                    self.device
-                        .begin_command_buffer(command_buffer, &command_buffer_begin_info)
-                        .expect("Failed to begin recording Command Buffer at beginning!");
-                }
-    
-                let clear_values = [
-                    vk::ClearValue {
-                        color: vk::ClearColorValue {
-                            float32: [0.0, 0.0, 0.0, 1.0],
-                        },
+    fn record_command_buffer(&mut self, resoultion: vk::Extent2D) {
+
+        for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
+            let command_buffer_begin_info = vk::CommandBufferBeginInfo::default()
+                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            unsafe {
+                self.device
+                    .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+                    .expect("Failed to begin recording Command Buffer at beginning!");
+            }
+
+            let clear_values = [
+                vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
                     },
-                    vk::ClearValue {
-                        // clear value for depth buffer
-                        depth_stencil: vk::ClearDepthStencilValue {
-                            depth: 1.0,
-                            stencil: 0,
-                        },
+                },
+                vk::ClearValue {
+                    // clear value for depth buffer
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
                     },
-                ];
-    
-                let render_pass_begin_info = vk::RenderPassBeginInfo::default()
-                    .render_pass(self.render_pass)
-                    .framebuffer(self.swapchain_framebuffers[i])
-                    .clear_values(&clear_values)
-                    .render_area(vk::Rect2D {
-                        offset: vk::Offset2D { x: 0, y: 0 },
-                        extent: self.resoultion,
-                    });
-    
-                unsafe {
-                    self.device.cmd_begin_render_pass(
-                        command_buffer,
-                        &render_pass_begin_info,
-                        vk::SubpassContents::INLINE,
-                    );
-    
-                    self.device.cmd_bind_pipeline(
-                        command_buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        self.graphics_pipeline,
-                    );
-                    let vertex_buffers = [self.vertex_buffer];
-                    let offsets = [0_u64];
-                    let descriptor_sets_to_bind = [self.descriptor_sets[i]];
-    
-                    self.device
-                        .cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
-                    self.device.cmd_bind_index_buffer(
-                        command_buffer,
-                        self.index_buffer,
-                        0,
-                        vk::IndexType::UINT32,
-                    );
-                    self.device.cmd_bind_descriptor_sets(
-                        command_buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        self.pipeline_layout,
-                        0,
-                        &descriptor_sets_to_bind,
-                        &[],
-                    );
-    
-                    self.device
-                        .cmd_draw_indexed(command_buffer, self.index_count(), 1, 0, 0, 0);
-    
-                    self.device.cmd_end_render_pass(command_buffer);
-    
-                    self.device
-                        .end_command_buffer(command_buffer)
-                        .expect("Failed to record Command Buffer at Ending!");
-                }
-    
+                },
+            ];
+
+            let render_pass_begin_info = vk::RenderPassBeginInfo::default()
+                .render_pass(self.render_pass)
+                .framebuffer(self.swapchain_framebuffers[i])
+                .clear_values(&clear_values)
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent: resoultion,
+                });
+
+            unsafe {
+                self.device.cmd_begin_render_pass(
+                    command_buffer,
+                    &render_pass_begin_info,
+                    vk::SubpassContents::INLINE,
+                );
+
+                self.device.cmd_bind_pipeline(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.graphics_pipeline,
+                );
+                let vertex_buffers = [self.vertex_buffer];
+                let offsets = [0_u64];
+                let descriptor_sets_to_bind = [self.descriptor_sets[i]];
+
+                self.device
+                    .cmd_bind_vertex_buffers(command_buffer, 0, &vertex_buffers, &offsets);
+                self.device.cmd_bind_index_buffer(
+                    command_buffer,
+                    self.index_buffer,
+                    0,
+                    vk::IndexType::UINT32,
+                );
+                self.device.cmd_bind_descriptor_sets(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout,
+                    0,
+                    &descriptor_sets_to_bind,
+                    &[],
+                );
+
+                self.device
+                    .cmd_draw_indexed(command_buffer, self.index_count(), 1, 0, 0, 0);
+
+                self.device.cmd_end_render_pass(command_buffer);
+
+                self.device
+                    .end_command_buffer(command_buffer)
+                    .expect("Failed to record Command Buffer at Ending!");
+            }
         }
-        };
-        record
     }
 
     fn recreate(&mut self, vk: &VulkanBase) {
@@ -283,7 +278,6 @@ impl RenderState for VulkanResource {
             vk.depth_image_view,
             vk.swapchain_extent,
         );
-        self.resoultion = vk.swapchain_extent;
         // self.record_command_buffer();
     }
 }
@@ -413,7 +407,7 @@ fn prepare(vk: &VulkanBase) -> VulkanResource {
         view: camera.get_view_matrix(),
         proj: camera.get_perspective_projection_matrix(),
     };
-    let resoultion = vk.swapchain_extent;
+
     VulkanResource {
         device: vk.device.clone(),
         command_pool: vk.command_pool,
@@ -438,7 +432,6 @@ fn prepare(vk: &VulkanBase) -> VulkanResource {
         uniform_buffers,
         uniform_buffers_memory,
         swapchain_imageviews,
-        resoultion,
     }
 }
 

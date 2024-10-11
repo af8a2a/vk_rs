@@ -86,6 +86,10 @@ impl Camera {
         self.front = quat_rotate_vec3(&(q_yaw * q_pitch), &self.front);
         self.right = quat_rotate_vec3(&(q_yaw * q_pitch), &self.right);
         self.up = -self.front.cross(&self.right);
+
+        self.front= nalgebra_glm::normalize(&self.front);
+        self.right= nalgebra_glm::normalize(&self.right);
+        self.up= nalgebra_glm::normalize(&self.up);
     }
 
 }

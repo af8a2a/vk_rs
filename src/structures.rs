@@ -110,6 +110,6 @@ pub trait RenderResource {
 pub trait RenderState {
     fn update_uniform_buffer(&mut self, current_image: usize, delta_time: f32);
     fn update_input(&mut self, input_state: &InputState, delta_time: f32);
-    fn record_command_buffer(&mut self, resoultion: vk::Extent2D);
+    fn record_command_buffer(&mut self)->impl Fn() -> ();
     fn recreate(&mut self,vk: &VulkanBase);
 }

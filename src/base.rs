@@ -1,20 +1,18 @@
 use std::sync::Arc;
 
 use crate::structures::{InputState, RenderResource, RenderState};
-use crate::util::command_buffer::create_command_pool;
+use crate::structures::{QueueFamilyIndices, SurfaceStuff};
+use crate::util::command_buffer::{create_command_pool, record_submit_commandbuffer};
 use crate::util::debug::setup_debug_utils;
 use crate::util::descriptor::create_descriptor_pool;
 use crate::util::device::{create_logical_device, pick_physical_device};
-use crate::util::image::{
-    create_image, create_image_view, create_image_views,
-};
+use crate::util::find_depth_format;
+use crate::util::image::{create_image, create_image_view, create_image_views};
 use crate::util::instance::create_instance;
 use crate::util::sampler::create_texture_sampler;
 use crate::util::surface::create_surface;
 use crate::util::swapchain::create_swapchain;
 use crate::util::sync::create_sync_objects;
-use crate::util::find_depth_format;
-use crate::structures::{QueueFamilyIndices, SurfaceStuff};
 use ash::ext::debug_utils;
 use ash::khr::{surface, swapchain};
 use ash::{vk, Entry};
@@ -45,16 +43,7 @@ pub struct VulkanBase {
     pub swapchain_format: vk::Format,
     pub swapchain_extent: vk::Extent2D,
     pub swapchain_imageviews: Vec<vk::ImageView>,
-    // pub swapchain_framebuffers: Vec<vk::Framebuffer>,
 
-    // pub render_pass: vk::RenderPass,
-    // pub ubo_layout: vk::DescriptorSetLayout,
-    // pub pipeline_layout: vk::PipelineLayout,
-    // pub graphics_pipeline: vk::Pipeline,
-
-    // pub texture_image: vk::Image,
-    // pub texture_image_view: vk::ImageView,
-    // pub texture_image_memory: vk::DeviceMemory,
     pub texture_sampler: vk::Sampler,
 
     pub depth_image: vk::Image,
@@ -62,7 +51,6 @@ pub struct VulkanBase {
     pub depth_image_memory: vk::DeviceMemory,
 
     pub command_pool: vk::CommandPool,
-    // pub command_buffers: Vec<vk::CommandBuffer>,
     pub descriptor_pool: vk::DescriptorPool,
 
     pub image_available_semaphores: Vec<vk::Semaphore>,
@@ -214,13 +202,22 @@ impl VulkanBase {
         };
 
         resource.update_uniform_buffer(image_index as usize, delta_time);
-        resource.record_command_buffer(self.swapchain_extent);
+
+        record_submit_commandbuffer(
+            &self.device,
+            *resource.fetch_command_buffer(self.current_frame),
+            wait_fences[0],
+            self.graphics_queue,
+            &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT],
+            &*self.image_available_semaphores,
+            &self.render_finished_semaphores,
+            resource.record_command_buffer(),
+        );
         
+
         let wait_semaphores = [self.image_available_semaphores[self.current_frame]];
         let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let signal_semaphores = [self.render_finished_semaphores[self.current_frame]];
-
-
 
         let binding = [*resource.fetch_command_buffer(image_index as usize)];
         let submit_infos = [vk::SubmitInfo::default()
@@ -305,16 +302,6 @@ impl VulkanBase {
         self.swapchain_imageviews =
             create_image_views(&self.device, self.swapchain_format, &self.swapchain_images);
 
-        // let graphics_pipeline = create_graphics_pipeline(
-        //     &self.device,
-        //     self.render_pass,
-        //     swapchain_stuff.swapchain_extent,
-        // );
-        // let pipeline_layout = create_pipeline_layout(&self.device, &self.ubo_layout);
-
-        // self.graphics_pipeline = graphics_pipeline;
-        // self.pipeline_layout = pipeline_layout;
-
         let depth_resources = Self::create_depth_resources(
             &self.instance,
             &self.device,
@@ -328,15 +315,6 @@ impl VulkanBase {
         self.depth_image = depth_resources.0;
         self.depth_image_view = depth_resources.1;
         self.depth_image_memory = depth_resources.2;
-
-        
-        // self.swapchain_framebuffers = create_framebuffers(
-        //     &self.device,
-        //     self.render_pass,
-        //     &self.swapchain_imageviews,
-        //     self.depth_image_view,
-        //     self.swapchain_extent,
-        // );
     }
 
     fn cleanup_swapchain(&self) {
@@ -390,7 +368,6 @@ impl VulkanBase {
 impl Drop for VulkanBase {
     fn drop(&mut self) {
         unsafe {
-            self.device.device_wait_idle().expect("Device lost!");
             for i in 0..MAX_FRAMES_IN_FLIGHT {
                 self.device
                     .destroy_semaphore(self.image_available_semaphores[i], None);
@@ -404,24 +381,7 @@ impl Drop for VulkanBase {
             self.device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
 
-            // for i in 0..self.uniform_buffers.len() {
-            //     self.device.destroy_buffer(self.uniform_buffers[i], None);
-            //     self.device
-            //         .free_memory(self.uniform_buffers_memory[i], None);
-            // }
-            // self.device
-            //     .destroy_descriptor_set_layout(self.ubo_layout, None);
-
-            // self.device.destroy_buffer(self.vertex_buffer, None);
-            // self.device.free_memory(self.vertex_buffer_memory, None);
-            // self.device.destroy_buffer(self.index_buffer, None);
-            // self.device.free_memory(self.index_buffer_memory, None);
-
-            // self.device.destroy_image(self.texture_image, None);
-            // self.device.free_memory(self.texture_image_memory, None);
             self.device.destroy_sampler(self.texture_sampler, None);
-            // self.device
-            //     .destroy_image_view(self.texture_image_view, None);
 
             self.device.destroy_command_pool(self.command_pool, None);
 

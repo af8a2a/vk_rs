@@ -6,7 +6,7 @@ use crate::structures::QueueFamilyIndices;
 /// is executed. That way we can delay the waiting for the fences by 1 frame which is good for performance.
 /// Make sure to create the fence in a signaled state on the first use.
 #[allow(clippy::too_many_arguments)]
-pub fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
+pub fn record_submit_commandbuffer<F: Fn()>(
     device: &ash::Device,
     command_buffer: vk::CommandBuffer,
     command_buffer_reuse_fence: vk::Fence,
@@ -38,7 +38,7 @@ pub fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
         device
             .begin_command_buffer(command_buffer, &command_buffer_begin_info)
             .expect("Begin commandbuffer");
-        f(device, command_buffer);
+        f();
         device
             .end_command_buffer(command_buffer)
             .expect("End commandbuffer");
@@ -62,6 +62,7 @@ pub fn create_command_pool(
     queue_families: &QueueFamilyIndices,
 ) -> vk::CommandPool {
     let command_pool_create_info = vk::CommandPoolCreateInfo::default()
+        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
         .queue_family_index(queue_families.graphics_family.unwrap());
     unsafe {
         device
@@ -84,7 +85,6 @@ pub fn create_command_buffers(
             .allocate_command_buffers(&command_buffer_allocate_info)
             .expect("Failed to allocate Command Buffers!")
     };
-
 
     command_buffers
 }

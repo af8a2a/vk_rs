@@ -4,6 +4,10 @@ use ash::vk;
 
 use crate::base::VulkanBase;
 
+
+pub mod texture;
+
+
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {

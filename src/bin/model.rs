@@ -6,6 +6,7 @@ use ash::vk::{self, PipelineLayoutCreateInfo};
 use nalgebra_glm::{Mat4x4, Vec3};
 use vk_rs::base::VulkanBase;
 use vk_rs::camera::{Camera, Direction};
+use vk_rs::structures::texture::Texture;
 use vk_rs::structures::{InputState, RenderResource, RenderState, Vertex};
 use vk_rs::util::buffer::{create_index_buffer, create_vertex_buffer};
 use vk_rs::util::command_buffer::{create_command_buffers, record_submit_commandbuffer};
@@ -14,7 +15,7 @@ use vk_rs::util::descriptor::{
 };
 use vk_rs::util::fps_limiter::FPSLimiter;
 use vk_rs::util::framebuffer::create_framebuffers;
-use vk_rs::util::image::{create_image_view, create_image_views, create_texture_image};
+use vk_rs::util::image::{create_image_view, create_image_views};
 use vk_rs::util::pipeline::{
     create_graphics_pipeline, create_pipeline_layout, create_render_pass, create_shader_module,
     load_spirv,
@@ -57,9 +58,8 @@ struct VulkanResource {
     pub index_buffer_memory: vk::DeviceMemory,
 
     //texture
-    pub texture_image: vk::Image,
+    pub texture: Texture,
     pub texture_image_view: vk::ImageView,
-    pub texture_image_memory: vk::DeviceMemory,
 
     pub descriptor_sets: Vec<vk::DescriptorSet>,
 
@@ -109,8 +109,8 @@ impl Drop for VulkanResource {
 
             self.device
                 .destroy_image_view(self.texture_image_view, None);
-            self.device.destroy_image(self.texture_image, None);
-            self.device.free_memory(self.texture_image_memory, None);
+            // self.device.destroy_image(self.texture_image, None);
+            // self.device.free_memory(self.texture_image_memory, None);
 
             self.device
                 .destroy_descriptor_set_layout(self.ubo_layout, None);
@@ -162,7 +162,6 @@ impl RenderState for VulkanResource {
     }
 
     fn record_command_buffer(&mut self, resoultion: vk::Extent2D) {
-
         for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
             let command_buffer_begin_info = vk::CommandBufferBeginInfo::default()
                 .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -322,20 +321,17 @@ struct ModelApp {
 fn prepare(vk: &VulkanBase) -> VulkanResource {
     let (vertices, indices) = vk_rs::util::load_model(&Path::new(MODEL_PATH));
 
-    let (texture_image, texture_image_memory) = create_texture_image(
+    let texture = Texture::load_from_path(
         &vk.device,
         vk.command_pool,
         vk.graphics_queue,
         &vk.memory_properties,
         Path::new(TEXTURE_PATH),
+        "unname_texture",
     );
-    let texture_image_view = create_image_view(
-        &vk.device,
-        texture_image,
-        vk::Format::R8G8B8A8_SRGB,
-        vk::ImageAspectFlags::COLOR,
-        1,
-    );
+
+    let texture_image_view = texture.create_srv();
+
 
     let swapchain_imageviews =
         create_image_views(&vk.device, vk.swapchain_format, &vk.swapchain_images);
@@ -421,9 +417,10 @@ fn prepare(vk: &VulkanBase) -> VulkanResource {
         index_buffer,
         vertex_buffer_memory,
         index_buffer_memory,
-        texture_image,
+        // texture_image,
+        texture,
         texture_image_view,
-        texture_image_memory,
+        // texture_image_memory,
         descriptor_sets,
         swapchain_framebuffers,
         command_buffers,

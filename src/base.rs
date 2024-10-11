@@ -338,7 +338,7 @@ impl VulkanBase {
         msaa_samples: vk::SampleCountFlags,
     ) -> (vk::Image, vk::ImageView, vk::DeviceMemory) {
         let depth_format = find_depth_format(instance, physical_device);
-        let (depth_image, depth_image_memory) = create_image(
+        let (depth_image, depth_image_memory,_) = create_image(
             device,
             swapchain_extent.width,
             swapchain_extent.height,

@@ -79,8 +79,7 @@ struct VulkanResource {
 impl Drop for VulkanResource {
     fn drop(&mut self) {
         unsafe {
-            self.device.device_wait_idle().unwrap();
-
+            self.device.device_wait_idle();
             self.device.destroy_buffer(self.vertex_buffer, None);
             self.device.free_memory(self.vertex_buffer_memory, None);
             self.device.destroy_buffer(self.index_buffer, None);
@@ -109,9 +108,11 @@ impl Drop for VulkanResource {
 
             self.device
                 .destroy_image_view(self.texture_image_view, None);
-
+            // self.texture.cleanup();
+            self.texture.cleanup();
             self.device
                 .destroy_descriptor_set_layout(self.ubo_layout, None);
+            println!("resource free");
         }
     }
 }
@@ -316,6 +317,8 @@ struct ModelApp {
     state: InputState,
 }
 
+
+
 fn prepare(vk: &VulkanBase) -> VulkanResource {
     let (vertices, indices) = vk_rs::util::load_model(&Path::new(MODEL_PATH));
 
@@ -329,7 +332,6 @@ fn prepare(vk: &VulkanBase) -> VulkanResource {
     );
 
     let texture_image_view = texture.create_srv();
-
 
     let swapchain_imageviews =
         create_image_views(&vk.device, vk.swapchain_format, &vk.swapchain_images);

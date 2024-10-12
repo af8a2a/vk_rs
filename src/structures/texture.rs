@@ -178,14 +178,6 @@ impl Texture {
     }
 }
 
-impl Drop for Texture {
-    fn drop(&mut self) {
-        unsafe {
-            self.device.destroy_image(self.image, None);
-            self.device.free_memory(self.memory, None);
-        };
-    }
-}
 
 fn transition_image_layout(
     device: &ash::Device,

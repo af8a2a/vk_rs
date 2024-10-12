@@ -282,6 +282,11 @@ impl VulkanBase {
                 .device_wait_idle()
                 .expect("Failed to wait device idle!")
         };
+
+        unsafe {
+            self.device.destroy_image_view(self.depth_image_view, None);
+            self.depth_texture.cleanup();
+        }
         self.cleanup_swapchain();
 
         let swapchain_stuff = create_swapchain(
@@ -311,18 +316,12 @@ impl VulkanBase {
             &self.memory_properties,
             vk::SampleCountFlags::TYPE_1,
         );
-        // self.depth_image = depth_resources.0;
+
         self.depth_image_view = self.depth_texture.create_dsv();
-        // self.depth_image_memory = depth_resources.2;
     }
 
     fn cleanup_swapchain(&self) {
         unsafe {
-            self.device.destroy_image_view(self.depth_image_view, None);
-            self.depth_texture.cleanup();
-            // self.device.destroy_image(self.depth_image, None);
-            // self.device.free_memory(self.depth_image_memory, None);
-
             for &image_view in self.swapchain_imageviews.iter() {
                 self.device.destroy_image_view(image_view, None);
             }
@@ -367,6 +366,8 @@ impl VulkanBase {
 impl Drop for VulkanBase {
     fn drop(&mut self) {
         unsafe {
+            self.device.device_wait_idle();
+
             for i in 0..MAX_FRAMES_IN_FLIGHT {
                 self.device
                     .destroy_semaphore(self.image_available_semaphores[i], None);
@@ -376,7 +377,8 @@ impl Drop for VulkanBase {
             }
 
             self.cleanup_swapchain();
-
+            self.device.destroy_image_view(self.depth_image_view, None);
+            self.depth_texture.cleanup();
             self.device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
 
@@ -384,6 +386,7 @@ impl Drop for VulkanBase {
 
             self.device.destroy_command_pool(self.command_pool, None);
 
+            println!("destroy device");
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
 

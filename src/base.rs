@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::structures::texture::Texture;
 use crate::structures::{InputState, RenderResource, RenderState};
 use crate::structures::{QueueFamilyIndices, SurfaceStuff};
 use crate::util::command_buffer::create_command_pool;
@@ -46,9 +47,10 @@ pub struct VulkanBase {
 
     pub texture_sampler: vk::Sampler,
 
-    pub depth_image: vk::Image,
+    // pub depth_image: vk::Image,
     pub depth_image_view: vk::ImageView,
-    pub depth_image_memory: vk::DeviceMemory,
+    // pub depth_image_memory: vk::DeviceMemory,
+    pub depth_texture: Texture,
 
     pub command_pool: vk::CommandPool,
     pub descriptor_pool: vk::DescriptorPool,
@@ -105,7 +107,7 @@ impl VulkanBase {
             let command_pool = create_command_pool(&device, &queue_family);
             let texture_sampler = create_texture_sampler(&device);
 
-            let (depth_image, depth_image_view, depth_image_memory) = Self::create_depth_resources(
+            let depth_texture = Self::create_depth_resources(
                 &instance,
                 &device,
                 physical_device,
@@ -115,6 +117,7 @@ impl VulkanBase {
                 &physical_device_memory_properties,
                 vk::SampleCountFlags::TYPE_1,
             );
+            let depth_image_view = depth_texture.create_dsv();
 
             let descriptor_pool =
                 create_descriptor_pool(&device, swapchain_stuff.swapchain_images.len());
@@ -156,11 +159,11 @@ impl VulkanBase {
                 descriptor_pool,
                 texture_sampler,
 
-                depth_image,
+                // depth_image,
                 depth_image_view,
-                depth_image_memory,
-
+                // depth_image_memory,
                 memory_properties: physical_device_memory_properties,
+                depth_texture,
             }
         }
     }
@@ -298,7 +301,7 @@ impl VulkanBase {
         self.swapchain_imageviews =
             create_image_views(&self.device, self.swapchain_format, &self.swapchain_images);
 
-        let depth_resources = Self::create_depth_resources(
+        self.depth_texture = Self::create_depth_resources(
             &self.instance,
             &self.device,
             self.physical_device,
@@ -308,16 +311,17 @@ impl VulkanBase {
             &self.memory_properties,
             vk::SampleCountFlags::TYPE_1,
         );
-        self.depth_image = depth_resources.0;
-        self.depth_image_view = depth_resources.1;
-        self.depth_image_memory = depth_resources.2;
+        // self.depth_image = depth_resources.0;
+        self.depth_image_view = self.depth_texture.create_dsv();
+        // self.depth_image_memory = depth_resources.2;
     }
 
     fn cleanup_swapchain(&self) {
         unsafe {
             self.device.destroy_image_view(self.depth_image_view, None);
-            self.device.destroy_image(self.depth_image, None);
-            self.device.free_memory(self.depth_image_memory, None);
+            self.depth_texture.cleanup();
+            // self.device.destroy_image(self.depth_image, None);
+            // self.device.free_memory(self.depth_image_memory, None);
 
             for &image_view in self.swapchain_imageviews.iter() {
                 self.device.destroy_image_view(image_view, None);
@@ -329,16 +333,16 @@ impl VulkanBase {
 
     fn create_depth_resources(
         instance: &ash::Instance,
-        device: &ash::Device,
+        device: &Arc<ash::Device>,
         physical_device: vk::PhysicalDevice,
         _command_pool: vk::CommandPool,
         _submit_queue: vk::Queue,
         swapchain_extent: vk::Extent2D,
         device_memory_properties: &vk::PhysicalDeviceMemoryProperties,
         msaa_samples: vk::SampleCountFlags,
-    ) -> (vk::Image, vk::ImageView, vk::DeviceMemory) {
+    ) -> Texture {
         let depth_format = find_depth_format(instance, physical_device);
-        let (depth_image, depth_image_memory,_) = create_image(
+        let (depth_image, depth_image_memory, info) = create_image(
             device,
             swapchain_extent.width,
             swapchain_extent.height,
@@ -350,15 +354,14 @@ impl VulkanBase {
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
             device_memory_properties,
         );
-        let depth_image_view = create_image_view(
-            device,
+        let texture = Texture::new(
+            device.clone(),
             depth_image,
-            depth_format,
-            vk::ImageAspectFlags::DEPTH,
-            1,
+            depth_image_memory,
+            "Depth",
+            info,
         );
-
-        (depth_image, depth_image_view, depth_image_memory)
+        texture
     }
 }
 impl Drop for VulkanBase {

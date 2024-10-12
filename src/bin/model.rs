@@ -109,8 +109,6 @@ impl Drop for VulkanResource {
 
             self.device
                 .destroy_image_view(self.texture_image_view, None);
-            // self.device.destroy_image(self.texture_image, None);
-            // self.device.free_memory(self.texture_image_memory, None);
 
             self.device
                 .destroy_descriptor_set_layout(self.ubo_layout, None);

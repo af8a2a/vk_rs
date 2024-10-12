@@ -21,13 +21,34 @@ pub struct ImageInfo {
 pub struct Texture {
     pub image: vk::Image,
     pub memory: vk::DeviceMemory,
-    pub format: vk::Format,
     pub name: String,
     pub device: Arc<ash::Device>,
     pub info: ImageInfo,
 }
 
 impl Texture {
+    pub fn cleanup(&self) {
+        unsafe {
+            self.device.destroy_image(self.image, None);
+            self.device.free_memory(self.memory, None);
+        }
+    }
+
+    pub fn new(
+        device: Arc<ash::Device>,
+        image: vk::Image,
+        memory: vk::DeviceMemory,
+        name: &str,
+        info: ImageInfo,
+    ) -> Self {
+        Self {
+            image,
+            memory,
+            name: name.to_string(),
+            device,
+            info,
+        }
+    }
     pub fn load_from_path(
         device: &Arc<ash::Device>,
         command_pool: vk::CommandPool,
@@ -122,7 +143,6 @@ impl Texture {
         Self {
             image: texture_image,
             memory: texture_image_memory,
-            format: vk::Format::R8G8B8A8_SRGB,
             name: name.to_string(),
             device: device.clone(),
             info,
@@ -133,14 +153,14 @@ impl Texture {
         create_image_view(
             &self.device,
             self.image,
-            self.format,
+            self.info.format,
             vk::ImageAspectFlags::COLOR,
             self.info.mip_levels,
         )
     }
 
     pub fn create_dsv(&self) -> vk::ImageView {
-        let flag = match self.format {
+        let flag = match self.info.format {
             vk::Format::D16_UNORM_S8_UINT
             | vk::Format::D24_UNORM_S8_UINT
             | vk::Format::D32_SFLOAT_S8_UINT => {
@@ -151,7 +171,7 @@ impl Texture {
         create_image_view(
             &self.device,
             self.image,
-            self.format,
+            self.info.format,
             flag,
             self.info.mip_levels,
         )

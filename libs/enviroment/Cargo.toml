@@ -1,0 +1,12 @@
+[package]
+name = "environment"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+vks.workspace = true
+util.workspace = true
+math.workspace = true
+
+log.workspace = true

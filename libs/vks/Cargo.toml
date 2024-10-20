@@ -1,0 +1,32 @@
+[package]
+name = "vks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+log.workspace = true
+ash.workspace = true
+ash-window.workspace = true
+raw-window-handle.workspace = true
+winit.workspace = true
+math.workspace = true
+egui.workspace = true
+egui-winit.workspace = true
+
+
+
+byteorder.workspace = true
+mikktspace.workspace = true
+
+[dependencies.gltf]
+workspace = true
+features = [
+    "KHR_lights_punctual", 
+    "KHR_materials_unlit", 
+    "KHR_materials_pbrSpecularGlossiness",
+    "KHR_materials_emissive_strength",
+    "KHR_materials_clearcoat",
+    "KHR_texture_transform",
+    "KHR_materials_ior",
+]

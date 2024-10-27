@@ -64,7 +64,7 @@ pub fn create_skins_from_gltf(gltf_skins: GltfSkins, data: &[Data]) -> Vec<Skin>
 fn map_skin(gltf_skin: &GltfSkin, data: &[Data]) -> Skin {
     let joint_count = gltf_skin.joints().count();
     if joint_count > MAX_JOINTS_PER_MESH {
-        log::warn!(
+        tracing::warn!(
             "Skin {} has more than {} joints ({}). Mesh might not display properly",
             gltf_skin.index(),
             MAX_JOINTS_PER_MESH,

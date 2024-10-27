@@ -337,7 +337,7 @@ impl Image {
                     vk::PipelineStageFlags2::FRAGMENT_SHADER,
                 ),
                 _ => {
-                    log::warn!("Undefined layout transition {old_layout:?} -> {new_layout:?}");
+                    tracing::warn!("Undefined layout transition {old_layout:?} -> {new_layout:?}");
 
                     (
                         vk::AccessFlags2::NONE,

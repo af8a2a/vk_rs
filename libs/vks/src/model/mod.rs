@@ -45,12 +45,12 @@ impl Model {
         command_buffer: vk::CommandBuffer,
         path: P,
     ) -> Result<PreLoadedResource<Model, ModelStagingResources>, Box<dyn Error>> {
-        log::debug!("Importing gltf file");
+        tracing::debug!("Importing gltf file");
         let (document, buffers, images) = gltf::import(&path)?;
 
         let metadata = Metadata::new(path, &document);
 
-        log::debug!("Creating the model");
+        tracing::debug!("Creating the model");
         if document.scenes().len() == 0 {
             return Err(Box::new(ModelLoadingError::new("There is no scene")));
         }

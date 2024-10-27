@@ -2,7 +2,7 @@
 
 
 [workspace]
-members = ["examples/triangle", "libs/*"]
+members = ["examples/quad", "libs/*"]
 
 resolver = "2"
 [workspace.package]
@@ -33,14 +33,15 @@ tobj = "4.0.2"
 cgmath = "0.18"
 rand = "0.8"
 lerp = "0.5"
-log = "0.4"
-env_logger = "0.11" 
+tracing = "0.1"
 byteorder = "1.4"
 mikktspace = "0.3"
 gltf = "1.4.1"
 egui = "0.29"
 egui-winit = "0.29"
 egui-ash-renderer = { version = "0.6", features = ["dynamic-rendering"] }
+serde = { version = "1.0", features = ["derive"] }
+tracing-subscriber = "0.3.0"
 
 [patch.crates-io.gltf]
 git = "https://github.com/adrien-ben/gltf"

@@ -63,11 +63,11 @@ impl<'a> mikktspace::Geometry for Mesh<'a> {
 }
 
 pub fn generate_tangents(indices: Option<&[u32]>, vertices: &mut [ModelVertex]) {
-    log::info!("Generating tangents");
+    tracing::info!("Generating tangents");
 
     let index_count = indices.map_or(0, |indices| indices.len());
     if !can_generate_inputs(index_count, vertices.len()) {
-        log::warn!("Tangents won't be generated");
+        tracing::warn!("Tangents won't be generated");
         return;
     }
 
@@ -91,17 +91,17 @@ pub fn generate_tangents(indices: Option<&[u32]>, vertices: &mut [ModelVertex]) 
 
 fn can_generate_inputs(index_count: usize, vertex_count: usize) -> bool {
     if vertex_count == 0 {
-        log::warn!("A primitive must have at least 1 vertex in order to generate tangents");
+        tracing::warn!("A primitive must have at least 1 vertex in order to generate tangents");
         return false;
     }
 
     if index_count > 0 && index_count % VERTEX_PER_FACE != 0 {
-        log::warn!("The number of indices for a given primitive mush be a multiple of 3");
+        tracing::warn!("The number of indices for a given primitive mush be a multiple of 3");
         return false;
     }
 
     if index_count == 0 && vertex_count % VERTEX_PER_FACE != 0 {
-        log::warn!(
+        tracing::warn!(
             "The number of vertices for a given primitive without indices mush be a multiple of 3"
         );
         return false;

@@ -16,7 +16,7 @@ pub(crate) fn create_irradiance_map(
     cubemap: &Texture,
     size: u32,
 ) -> Texture {
-    log::info!("Creating irradiance map");
+    tracing::info!("Creating irradiance map");
     let start = Instant::now();
 
     let device = context.device();
@@ -220,7 +220,7 @@ pub(crate) fn create_irradiance_map(
     }
 
     let time = start.elapsed().as_millis();
-    log::info!("Finished creating irradiance map. Took {} ms", time);
+    tracing::info!("Finished creating irradiance map. Took {} ms", time);
 
     irradiance_map
 }

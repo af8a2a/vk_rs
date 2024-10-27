@@ -67,7 +67,7 @@ impl QuadModel {
 }
 
 pub(crate) fn create_brdf_lookup(context: &Arc<Context>, size: u32) -> Texture {
-    log::info!("Creating brdf lookup");
+    tracing::info!("Creating brdf lookup");
     let start = Instant::now();
 
     let device = context.device();
@@ -199,7 +199,7 @@ pub(crate) fn create_brdf_lookup(context: &Arc<Context>, size: u32) -> Texture {
     }
 
     let time = start.elapsed().as_millis();
-    log::info!("Finished creating brdf lookup. Took {} ms", time);
+    tracing::info!("Finished creating brdf lookup. Took {} ms", time);
 
     lookup
 }

@@ -11,10 +11,10 @@ unsafe extern "system" fn vulkan_debug_callback(
 
     let message = CStr::from_ptr((*p_callback_data).p_message);
     match flag {
-        Flag::VERBOSE => log::debug!("{:?} - {:?}", typ, message),
-        Flag::INFO => log::info!("{:?} - {:?}", typ, message),
-        Flag::WARNING => log::warn!("{:?} - {:?}", typ, message),
-        _ => log::error!("{:?} - {:?}", typ, message),
+        Flag::VERBOSE => tracing::debug!("{:?} - {:?}", typ, message),
+        Flag::INFO => tracing::info!("{:?} - {:?}", typ, message),
+        Flag::WARNING => tracing::warn!("{:?} - {:?}", typ, message),
+        _ => tracing::error!("{:?} - {:?}", typ, message),
     }
     vk::FALSE
 }

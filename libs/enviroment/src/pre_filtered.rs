@@ -16,7 +16,7 @@ pub(crate) fn create_pre_filtered_map(
     cubemap: &Texture,
     size: u32,
 ) -> Texture {
-    log::info!("Creating pre-filtered map");
+    tracing::info!("Creating pre-filtered map");
     let start = Instant::now();
 
     let device = context.device();
@@ -258,7 +258,7 @@ pub(crate) fn create_pre_filtered_map(
     }
 
     let time = start.elapsed().as_millis();
-    log::info!("Finished creating pre-filtered map. Took {} ms", time);
+    tracing::info!("Finished creating pre-filtered map. Took {} ms", time);
 
     pre_filtered
 }

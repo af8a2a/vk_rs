@@ -17,7 +17,7 @@ pub(crate) fn create_skybox_cubemap<P: AsRef<Path>>(
     path: P,
     size: u32,
 ) -> Texture {
-    log::info!("Creating cubemap from equirectangular texture");
+    tracing::info!("Creating cubemap from equirectangular texture");
     let start = Instant::now();
     let device = context.device();
     let (w, h, data) = load_hdr_image(path);
@@ -233,7 +233,7 @@ pub(crate) fn create_skybox_cubemap<P: AsRef<Path>>(
     }
 
     let time = start.elapsed().as_millis();
-    log::info!(
+    tracing::info!(
         "Finished creating cubemap from equirectangular texture. Took {} ms",
         time
     );

@@ -9,4 +9,4 @@ vks.workspace = true
 util.workspace = true
 math.workspace = true
 
-log.workspace = true
+tracing.workspace = true

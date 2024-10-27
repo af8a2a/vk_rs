@@ -34,7 +34,7 @@ pub struct SharedContext {
 
 impl SharedContext {
     pub fn new(window: &Window, enable_debug: bool) -> Self {
-        let entry = unsafe { Entry::linked() };
+        let entry =  Entry::linked() ;
         let instance = create_instance(&entry, window, enable_debug);
 
         let surface = surface::Instance::new(&entry, &instance);
@@ -59,7 +59,7 @@ impl SharedContext {
             pick_physical_device(&instance, &surface, surface_khr);
 
         let (device, graphics_compute_queue, present_queue) =
-            create_logical_device_with_graphics_queue(
+            create_tracingical_device_with_graphics_queue(
                 &instance,
                 physical_device,
                 queue_families_indices,
@@ -162,7 +162,7 @@ fn pick_physical_device(
         .expect("No suitable physical device.");
 
     let props = unsafe { instance.get_physical_device_properties(device) };
-    log::debug!("Selected physical device: {:?}", unsafe {
+    tracing::debug!("Selected physical device: {:?}", unsafe {
         CStr::from_ptr(props.device_name.as_ptr())
     });
 
@@ -286,13 +286,13 @@ fn find_queue_families(
     (graphics_compute, present)
 }
 
-/// Create the logical device to interact with `device`, a graphics queue
+/// Create the tracingical device to interact with `device`, a graphics queue
 /// and a presentation queue.
 ///
 /// # Returns
 ///
-/// Return a tuple containing the logical device, the graphics queue and the presentation queue.
-fn create_logical_device_with_graphics_queue(
+/// Return a tuple containing the tracingical device, the graphics queue and the presentation queue.
+fn create_tracingical_device_with_graphics_queue(
     instance: &Instance,
     device: vk::PhysicalDevice,
     queue_families_indices: QueueFamiliesIndices,
@@ -345,7 +345,7 @@ fn create_logical_device_with_graphics_queue(
     let device = unsafe {
         instance
             .create_device(device, &device_create_info, None)
-            .expect("Failed to create logical device.")
+            .expect("Failed to create tracingical device.")
     };
     let graphics_compute_queue = unsafe { device.get_device_queue(graphics_family_index, 0) };
     let present_queue = unsafe { device.get_device_queue(present_family_index, 0) };

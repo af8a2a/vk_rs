@@ -32,7 +32,7 @@ impl Swapchain {
         preferred_format: Option<vk::SurfaceFormatKHR>,
         preferred_vsync: bool,
     ) -> Self {
-        log::debug!("Creating swapchain.");
+        tracing::debug!("Creating swapchain.");
 
         let properties = swapchain_support_details.get_ideal_swapchain_properties(
             preferred_format,
@@ -95,7 +95,7 @@ impl Swapchain {
 
         let swapchain = Self::new(context, swapchain, swapchain_khr, properties, images, views);
 
-        log::debug!(
+        tracing::debug!(
             "Created swapchain.\n\tFormat: {:?}\n\tColorSpace: {:?}\n\tPresentMode: {:?}\n\tExtent: {:?}\n\tImageCount: {:?}",
             format.format,
             format.color_space,

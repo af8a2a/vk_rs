@@ -1,8 +1,13 @@
+mod base;
 mod buffer;
+mod camera;
 mod context;
+mod controls;
 mod debug;
 mod descriptor;
 mod image;
+mod in_flight_frames;
+mod model;
 mod msaa;
 mod pipeline;
 mod shader;
@@ -10,13 +15,9 @@ mod swapchain;
 mod texture;
 mod util;
 mod vertex;
-mod controls;
-mod camera;
-mod base;
-mod model;
 pub use self::{
-    buffer::*, context::*, debug::*, descriptor::*, image::*, msaa::*, pipeline::*, shader::*,
-    swapchain::*, texture::*, util::*, vertex::*,camera::*, model::*
+    base::*, buffer::*, camera::*, context::*, debug::*, descriptor::*, image::*, model::*,
+    msaa::*, pipeline::*, shader::*, swapchain::*, texture::*, util::*, vertex::*,
 };
 
 pub use ash;

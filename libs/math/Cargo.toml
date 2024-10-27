@@ -1,0 +1,11 @@
+[package]
+name = "math"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+tracing.workspace = true
+cgmath.workspace = true
+rand.workspace = true
+lerp.workspace = true

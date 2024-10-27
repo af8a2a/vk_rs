@@ -1,12 +1,48 @@
-[package]
+
+
+
+[workspace]
+members = ["examples/quad", "libs/*"]
+
+resolver = "2"
+[workspace.package]
 name = "vk_rs"
 version = "0.1.0"
 edition = "2021"
+authors = ["af8a2a"]
 
-[dependencies]
-ash = { version = "0.38.0", default-features = false, features = ["linked", "debug", "std"] }
+[workspace.dependencies]
+
+vks = { path = "libs/vks" }
+math = { path = "libs/math" }
+util = { path = "libs/util" }
+environment = { path = "libs/enviroment" }
+
+
+ash = { version = "0.38.0", default-features = false, features = [
+    "linked",
+    "debug",
+    "std",
+] }
 winit = { version = "0.30.5" }
-ash-window = "0.13.0"
-image     = "0.25.2"
+ash-window = "0.13"
+raw-window-handle = "0.6"
+image = "0.25.2"
 nalgebra-glm = "0.19.0"
 tobj = "4.0.2"
+cgmath = "0.18"
+rand = "0.8"
+lerp = "0.5"
+tracing = "0.1"
+byteorder = "1.4"
+mikktspace = "0.3"
+gltf = "1.4.1"
+egui = "0.29"
+egui-winit = "0.29"
+egui-ash-renderer = { version = "0.6", features = ["dynamic-rendering"] }
+serde = { version = "1.0", features = ["derive"] }
+tracing-subscriber = "0.3.0"
+
+[patch.crates-io.gltf]
+git = "https://github.com/adrien-ben/gltf"
+branch = "missing_extensions"

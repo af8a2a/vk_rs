@@ -1,0 +1,9 @@
+[package]
+name = "util"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+tracing.workspace = true
+image.workspace = true

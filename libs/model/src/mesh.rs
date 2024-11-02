@@ -1,7 +1,7 @@
-use crate::{cmd_create_device_local_buffer_with_data, Buffer, Context};
+use vks::{cmd_create_device_local_buffer_with_data, Buffer, Context};
 
 use super::{generate_tangents, IndexBuffer, Material, ModelVertex, VertexBuffer};
-use ash::vk;
+use vks::ash::vk;
 use cgmath::Vector3;
 use gltf::{
     buffer::{Buffer as GltfBuffer, Data},

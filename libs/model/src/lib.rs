@@ -18,8 +18,8 @@ use cgmath::Matrix4;
 use math::*;
 use metadata::Metadata;
 use std::{error::Error, path::Path, result::Result, sync::Arc};
-use ash::vk;
-use crate::{Buffer, Context, PreLoadedResource};
+use vks::ash::vk;
+use vks::{Buffer, Context, PreLoadedResource};
 
 pub struct ModelStagingResources {
     _staged_vertices: Buffer,

@@ -1171,6 +1171,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "model"
+version = "0.1.0"
+dependencies = [
+ "cgmath",
+ "gltf",
+ "math",
+ "mikktspace",
+ "tracing",
+ "vks",
+]
+
+[[package]]
 name = "nalgebra"
 version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2438,9 +2450,7 @@ dependencies = [
  "byteorder",
  "egui",
  "egui-winit",
- "gltf",
  "math",
- "mikktspace",
  "raw-window-handle",
  "tracing",
  "winit",

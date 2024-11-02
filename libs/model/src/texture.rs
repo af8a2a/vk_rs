@@ -4,8 +4,8 @@ use gltf::json::texture::{MagFilter, MinFilter, WrappingMode};
 use gltf::texture::Sampler;
 use std::collections::HashSet;
 use std::sync::Arc;
-use ash::vk;
-use crate::{Buffer, Context, Image, Texture as VulkanTexture};
+use vks::ash::vk;
+use vks::{Buffer, Context, Image, Texture as VulkanTexture};
 
 pub(crate) struct Textures {
     _images: Vec<VulkanTexture>,

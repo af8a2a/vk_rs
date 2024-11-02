@@ -1,4 +1,4 @@
-use ash::vk;
+use vks::{ash::vk, Vertex};
 use std::{mem::size_of, sync::Arc};
 use crate::*;
 

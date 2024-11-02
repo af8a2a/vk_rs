@@ -7,7 +7,6 @@ mod debug;
 mod descriptor;
 mod image;
 mod in_flight_frames;
-mod model;
 mod msaa;
 mod pipeline;
 mod shader;
@@ -16,8 +15,8 @@ mod texture;
 mod util;
 mod vertex;
 pub use self::{
-    base::*, buffer::*, camera::*, context::*, debug::*, descriptor::*, image::*, model::*,
-    msaa::*, pipeline::*, shader::*, swapchain::*, texture::*, util::*, vertex::*,
+    base::*, buffer::*, camera::*, context::*, debug::*, descriptor::*, image::*, msaa::*,
+    pipeline::*, shader::*, swapchain::*, texture::*, util::*, vertex::*,
 };
 
 pub use ash;

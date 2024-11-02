@@ -43,7 +43,7 @@ impl SharedContext {
                 &entry,
                 &instance,
                 window.display_handle().unwrap().as_raw(),
-                window.window_handle().unwrap().as_raw(),
+                window.window_handle()  .unwrap().as_raw(),
                 None,
             )
             .expect("Failed to create surface")

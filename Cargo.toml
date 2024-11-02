@@ -16,8 +16,8 @@ authors = ["af8a2a"]
 vks = { path = "libs/vks" }
 math = { path = "libs/math" }
 util = { path = "libs/util" }
+model= { path = "libs/model" }
 environment = { path = "libs/enviroment" }
-
 
 ash = { version = "0.38.0", default-features = false, features = [
     "linked",

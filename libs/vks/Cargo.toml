@@ -13,8 +13,7 @@ winit.workspace = true
 math.workspace = true
 egui.workspace = true
 egui-winit.workspace = true
-
+getset.workspace = true
 
 
 byteorder.workspace = true
-

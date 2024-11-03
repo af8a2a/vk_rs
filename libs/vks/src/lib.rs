@@ -14,6 +14,7 @@ mod swapchain;
 mod texture;
 mod util;
 mod vertex;
+mod defered;
 pub use self::{
     base::*, buffer::*, camera::*, context::*, debug::*, descriptor::*, image::*, msaa::*,
     pipeline::*, shader::*, swapchain::*, texture::*, util::*, vertex::*,

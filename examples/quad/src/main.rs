@@ -10,7 +10,7 @@ use vks::{
     allocate_command_buffers, cmd_transition_images_layouts, create_device_local_buffer_with_data,
     create_pipeline, Buffer, Camera, Context, Descriptors, LayoutTransition, MipsRange,
     PipelineParameters, RenderError, ShaderParameters, Swapchain, SwapchainSupportDetails, Texture,
-    Vertex, VulkanExampleBase,
+    Vertex, VulkanExampleBase, WindowApp,
 };
 use winit::{
     application::ApplicationHandler,
@@ -233,7 +233,7 @@ fn prepare_pipeline(context: &Arc<Context>) -> (vk::Pipeline, vk::PipelineLayout
                 dynamic_state_info: Some(&dynamic_state_info),
                 depth_stencil_info: Some(&depth_stencil_info),
                 color_blend_attachments: &color_blend_attachments,
-                color_attachment_formats: &[vk::Format::R8G8B8A8_SNORM],
+                color_attachment_formats: &[vk::Format::R16G16B16A16_SFLOAT],
                 depth_attachment_format: None,
                 layout,
                 parent: None,
@@ -256,7 +256,7 @@ pub fn create_shader_module(device: &ash::Device, code: Vec<u32>) -> vk::ShaderM
 
 impl TriangleApp {
     fn new(window: &Window, enable_debug: bool) -> Self {
-        let base = VulkanExampleBase::new(window);
+        let base = VulkanExampleBase::new(window,enable_debug);
         let context = &base.context;
         let model = QuadModel::new(context);
 
@@ -271,9 +271,12 @@ impl TriangleApp {
             base,
         }
     }
-    pub fn new_frame(&mut self) {}
+}
 
-    pub fn handle_window_event(&mut self, _window: &Window, event: &WindowEvent) {
+impl WindowApp for TriangleApp {
+    fn new_frame(&mut self) {}
+
+    fn handle_window_event(&mut self, _window: &Window, event: &WindowEvent) {
         match event {
             // Dropped file
             WindowEvent::DroppedFile(_) => {
@@ -304,11 +307,11 @@ impl TriangleApp {
         }
     }
 
-    pub fn handle_device_event(&mut self, event: &DeviceEvent) {
+    fn handle_device_event(&mut self, event: &DeviceEvent) {
         // self.input_state = self.input_state.handle_device_event(event);
     }
 
-    pub fn recreate_swapchain(&mut self, dimensions: [u32; 2], vsync: bool, hdr: bool) {
+    fn recreate_swapchain(&mut self, dimensions: [u32; 2], vsync: bool, hdr: bool) {
         tracing::debug!("Recreating swapchain.");
 
         self.base.context.graphics_queue_wait_idle();
@@ -339,7 +342,7 @@ impl TriangleApp {
             allocate_command_buffers(&self.base.context, self.base.swapchain.image_count());
     }
 
-    pub fn end_frame(&mut self, window: &Window) {
+    fn end_frame(&mut self, window: &Window) {
         let new_time = Instant::now();
         let delta_s = (new_time - self.time).as_secs_f32();
         self.time = new_time;
@@ -349,7 +352,7 @@ impl TriangleApp {
             let PhysicalSize { width, height } = window.inner_size();
             if width > 0 && height > 0 {
                 self.base
-                    .recreate_swapchain(window.inner_size().into(), false, false);
+                    .recreate_swapchain(window.inner_size().into(), false, true);
             } else {
                 return;
             }
@@ -360,11 +363,11 @@ impl TriangleApp {
         );
     }
 
-    pub fn on_exit(&mut self) {
+    fn on_exit(&mut self) {
         self.base.wait_idle_gpu();
     }
 
-    pub fn render(&mut self, window: &Window, camera: Camera) -> Result<(), RenderError> {
+    fn render(&mut self, window: &Window, camera: Camera) -> Result<(), RenderError> {
         tracing::trace!("Drawing frame.");
         let sync_objects = self.base.in_flight_frames.next().unwrap();
         let image_available_semaphore = sync_objects.image_available_semaphore;

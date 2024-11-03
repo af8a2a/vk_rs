@@ -27,8 +27,8 @@ pub struct VulkanExampleBase {
 }
 
 impl VulkanExampleBase {
-    pub fn new(window: &Window) -> Self {
-        let context = Arc::new(Context::new(window, true));
+    pub fn new(window: &Window,enable_debug: bool) -> Self {
+        let context = Arc::new(Context::new(window, enable_debug));
         let swapchain_support_details = SwapchainSupportDetails::new(
             context.physical_device(),
             context.surface(),

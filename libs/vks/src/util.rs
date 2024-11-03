@@ -1,13 +1,21 @@
-use ash::{util::Align, vk::{self, DeviceSize}};
+use ash::{
+    util::Align,
+    vk::{self, DeviceSize},
+};
 use std::{ffi::c_void, mem::size_of, sync::Arc};
+use winit::{
+    dpi::PhysicalSize,
+    event::{DeviceEvent, ElementState, KeyEvent, WindowEvent},
+    keyboard::Key,
+    window::Window,
+};
 
-use crate::{in_flight_frames::{InFlightFrames, SyncObjects}, Context, Image, ImageParameters, Texture};
-
+use crate::{
+    in_flight_frames::{InFlightFrames, SyncObjects},
+    Camera, Context, Image, ImageParameters, RenderError, Texture,
+};
 
 pub const SCENE_COLOR_FORMAT: vk::Format = vk::Format::R32G32B32A32_SFLOAT;
-
-
-
 
 /// Utility function that copy the content of a slice at the position of a given pointer.
 pub unsafe fn mem_copy<T: Copy>(ptr: *mut c_void, data: &[T]) {
@@ -23,7 +31,6 @@ pub unsafe fn mem_copy_aligned<T: Copy>(ptr: *mut c_void, alignment: DeviceSize,
     let mut align = Align::new(ptr, alignment, size);
     align.copy_from_slice(data);
 }
-
 
 pub fn create_sampler(
     context: &Arc<Context>,
@@ -55,8 +62,6 @@ pub fn create_sampler(
     }
 }
 
-
-
 pub fn allocate_command_buffers(context: &Context, count: usize) -> Vec<vk::CommandBuffer> {
     let allocate_info = vk::CommandBufferAllocateInfo::default()
         .command_pool(context.general_command_pool())
@@ -70,7 +75,6 @@ pub fn allocate_command_buffers(context: &Context, count: usize) -> Vec<vk::Comm
             .unwrap()
     }
 }
-
 
 pub fn create_sync_objects(context: &Arc<Context>) -> InFlightFrames {
     let device = context.device();
@@ -116,8 +120,6 @@ pub fn find_depth_format(context: &Context) -> vk::Format {
         )
         .expect("Failed to find a supported depth format")
 }
-
-
 
 pub fn create_scene_color(
     context: &Arc<Context>,
@@ -203,4 +205,15 @@ pub fn create_scene_depth(
     };
 
     Texture::new(Arc::clone(context), image, view, sampler)
+}
+
+pub trait WindowApp {
+    fn new_frame(&mut self);
+    fn end_frame(&mut self, window: &Window);
+    fn handle_window_event(&mut self, _window: &Window, event: &WindowEvent);
+    fn handle_device_event(&mut self, event: &DeviceEvent);
+    fn recreate_swapchain(&mut self, dimensions: [u32; 2], vsync: bool, hdr: bool);
+    fn on_exit(&mut self) {}
+    fn render(&mut self, window: &Window, camera: Camera) -> Result<(), RenderError>;
+    fn cmd_draw(&mut self, command_buffer: vk::CommandBuffer, frame_index: usize);
 }

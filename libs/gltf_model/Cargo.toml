@@ -1,5 +1,5 @@
 [package]
-name = "model"
+name = "gltf_model"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

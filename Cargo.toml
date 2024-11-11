@@ -2,7 +2,7 @@
 
 
 [workspace]
-members = ["examples/quad", "libs/*"]
+members = ["examples/*", "libs/*"]
 
 resolver = "2"
 [workspace.package]
@@ -16,7 +16,7 @@ authors = ["af8a2a"]
 vks = { path = "libs/vks" }
 math = { path = "libs/math" }
 util = { path = "libs/util" }
-model= { path = "libs/model" }
+gltf_model= { path = "libs/gltf_model" }
 environment = { path = "libs/enviroment" }
 
 ash = { version = "0.38.0", default-features = false, features = [

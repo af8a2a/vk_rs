@@ -105,7 +105,7 @@ fn create_shader_stage_info<'a>(
     params: ShaderParameters<'a>,
 ) -> (ShaderModule, vk::PipelineShaderStageCreateInfo<'a>) {
     let extension = get_shader_file_extension(stage);
-    let shader_path = format!("shader/quad/{}.{}.spv", params.name, extension);
+    let shader_path = format!("shader/{}/{}.{}.spv",params.name, params.name, extension);
     let module = ShaderModule::new(Arc::clone(context), shader_path);
 
     let mut stage_info = vk::PipelineShaderStageCreateInfo::default()

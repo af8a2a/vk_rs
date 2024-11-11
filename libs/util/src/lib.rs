@@ -14,3 +14,12 @@ pub fn load_hdr_image<P: AsRef<Path>>(path: P) -> (u32, u32, Vec<f32>) {
 
     (w, h, data)
 }
+
+pub fn load_image<P: AsRef<Path>>(path: P) -> (u32, u32, Vec<u8>) {
+    let img = image::open(path).unwrap();
+    let w = img.width();
+    let h = img.height();
+    let data = img.into_rgba8().into_raw();
+
+    (w, h, data)
+}

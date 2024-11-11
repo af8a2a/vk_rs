@@ -524,6 +524,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 
 [[package]]
+name = "defered"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "egui",
+ "egui-ash-renderer",
+ "egui-winit",
+ "math",
+ "tracing",
+ "tracing-subscriber",
+ "util",
+ "vks",
+ "winit",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -829,6 +845,18 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+]
+
+[[package]]
+name = "gltf_model"
+version = "0.1.0"
+dependencies = [
+ "cgmath",
+ "gltf",
+ "math",
+ "mikktspace",
+ "tracing",
+ "vks",
 ]
 
 [[package]]
@@ -1180,18 +1208,6 @@ checksum = "e2d80299ef12ff69b16a84bb182e3b9df68b5a91574d3d4fa6e41b65deec4df1"
 dependencies = [
  "adler2",
  "simd-adler32",
-]
-
-[[package]]
-name = "model"
-version = "0.1.0"
-dependencies = [
- "cgmath",
- "gltf",
- "math",
- "mikktspace",
- "tracing",
- "vks",
 ]
 
 [[package]]
@@ -2483,6 +2499,7 @@ dependencies = [
  "ash-window",
  "byteorder",
  "egui",
+ "egui-ash-renderer",
  "egui-winit",
  "getset",
  "math",

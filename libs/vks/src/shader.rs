@@ -2,6 +2,7 @@ use super::Context;
 use ash::{vk, Device};
 use std::{path::Path, sync::Arc};
 
+
 pub struct ShaderModule {
     context: Arc<Context>,
     module: vk::ShaderModule,

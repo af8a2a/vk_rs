@@ -5,10 +5,12 @@ use egui::TextureId;
 
 use crate::Context;
 
+pub const MAX_FRAMES_IN_FLIGHT: u32 = 2;
+
 pub struct InFlightFrames {
     context: Arc<Context>,
     sync_objects: Vec<SyncObjects>,
-    gui_textures_to_free: Vec<TextureId>,
+    pub gui_textures_to_free: Vec<TextureId>,
     current_frame: usize,
 }
 

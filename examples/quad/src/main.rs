@@ -7,10 +7,7 @@ use ash::{
 };
 use tracing::{debug, info, Level};
 use vks::{
-    allocate_command_buffers, cmd_transition_images_layouts, create_device_local_buffer_with_data,
-    create_pipeline, Buffer, Camera, Context, Descriptors, LayoutTransition, MipsRange,
-    PipelineParameters, RenderError, ShaderParameters, Swapchain, SwapchainSupportDetails, Texture,
-    Vertex, VulkanExampleBase, WindowApp,
+    allocate_command_buffers, cmd_transition_images_layouts, create_device_local_buffer_with_data, create_pipeline, Buffer, Camera, Context, Descriptors, LayoutTransition, MipsRange, PipelineParameters, RenderData, RenderError, ShaderParameters, Swapchain, SwapchainSupportDetails, Texture, Vertex, VulkanExampleBase, WindowApp
 };
 use winit::{
     application::ApplicationHandler,
@@ -429,7 +426,7 @@ impl WindowApp for TriangleApp {
                 };
             }
 
-            self.cmd_draw(command_buffer, frame_index);
+            self.cmd_draw(command_buffer, frame_index,None);
 
             // End command buffer
             unsafe {
@@ -495,7 +492,7 @@ impl WindowApp for TriangleApp {
         Ok(())
     }
 
-    fn cmd_draw(&mut self, command_buffer: vk::CommandBuffer, frame_index: usize) {
+    fn cmd_draw(&mut self, command_buffer: vk::CommandBuffer, frame_index: usize,ui_render_data: Option<&RenderData>,) {
         // Prepare attachments and inputs for lighting pass
         let transitions = vec![
             LayoutTransition {

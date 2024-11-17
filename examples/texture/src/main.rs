@@ -5,13 +5,15 @@ use ash::{
     vk::{self, Extent2D, PipelineLayoutCreateInfo, RenderingAttachmentInfo, RenderingInfo},
     Device,
 };
+use egui_ash_renderer::{DynamicRendering, Options, Renderer};
 use tracing::{debug, info, Level};
 use util::load_image;
 use vks::{
     allocate_command_buffers, cmd_transition_images_layouts, create_device_local_buffer_with_data,
-    create_pipeline, Buffer, Camera, CameraUBO, Context, Descriptors, Image, ImageParameters,
-    LayoutTransition, MipsRange, PipelineParameters, RenderError, ShaderParameters, Swapchain,
-    SwapchainSupportDetails, Texture, Vertex, VulkanExampleBase, WindowApp,
+    create_pipeline, Buffer, Camera, CameraUBO, Context, Descriptors, Gui, Image, ImageParameters,
+    LayoutTransition, MipsRange, PipelineParameters, RenderData, RenderError, RendererSetting,
+    ShaderParameters, Swapchain, SwapchainSupportDetails, Texture, Vertex, VulkanExampleBase,
+    WindowApp, MAX_FRAMES_IN_FLIGHT,
 };
 use winit::{
     application::ApplicationHandler,
@@ -93,8 +95,8 @@ impl ApplicationHandler for App {
 #[derive(Clone, Copy)]
 #[allow(dead_code)]
 struct QuadVertex {
-   pub position: [f32; 2],
-   pub coords: [f32; 2],
+    pub position: [f32; 2],
+    pub coords: [f32; 2],
 }
 
 impl Vertex for QuadVertex {
@@ -118,7 +120,7 @@ impl Vertex for QuadVertex {
                 location: 1,
                 binding: 0,
                 format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(QuadVertex,coords) as u32,
+                offset: offset_of!(QuadVertex, coords) as u32,
             },
         ]
     }
@@ -157,7 +159,6 @@ impl QuadModel {
             },
         ];
 
-
         let vertices = create_device_local_buffer_with_data::<u8, _>(
             context,
             vk::BufferUsageFlags::VERTEX_BUFFER,
@@ -177,14 +178,18 @@ pub struct TextureApp {
     texture: Texture,
     camera: Camera,
     time: Instant,
+    gui_renderer: Renderer,
+    gui_context: Gui,
     dirty_swapchain: bool,
 }
 
-fn prepare_pipeline(context: &Arc<Context>,set_layouts: &[vk::DescriptorSetLayout]) -> (vk::Pipeline, vk::PipelineLayout) {
+fn prepare_pipeline(
+    context: &Arc<Context>,
+    set_layouts: &[vk::DescriptorSetLayout],
+) -> (vk::Pipeline, vk::PipelineLayout) {
     let device = context.device();
     let layout = {
-        let layout_info = vk::PipelineLayoutCreateInfo::default()
-        .set_layouts(set_layouts);
+        let layout_info = vk::PipelineLayoutCreateInfo::default().set_layouts(set_layouts);
 
         unsafe { device.create_pipeline_layout(&layout_info, None).unwrap() }
     };
@@ -390,16 +395,32 @@ impl TextureApp {
         let model = QuadModel::new(context);
 
         let (width, height, image_data) = load_image("assets/android.png");
-        
+
         let texture = Texture::from_rgba(&context, width, height, &image_data, true);
         let desc_layout = create_descriptor_set_layout(context.device());
-        let (pipeline, pipeline_layout) = prepare_pipeline(context,&[desc_layout]);
+        let (pipeline, pipeline_layout) = prepare_pipeline(context, &[desc_layout]);
         let camera_ubos = create_camera_ubos(&context, base.swapchain.image_count() as u32);
         let pool = create_descriptor_pool(context.device(), camera_ubos.len() as u32);
-        
+
         let desc_sets = create_descriptor_sets(context, pool, desc_layout, &camera_ubos, &texture);
         let descriptors = Descriptors::new(context.clone(), desc_layout, pool, desc_sets);
+        let gui_renderer = Renderer::with_default_allocator(
+            base.context.instance(),
+            base.context.physical_device(),
+            base.context.device().clone(),
+            DynamicRendering {
+                color_attachment_format: base.swapchain.properties().format.format,
+                depth_attachment_format: None,
+            },
+            Options {
+                in_flight_frames: MAX_FRAMES_IN_FLIGHT as _,
+                srgb_framebuffer: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
+        let gui_context = Gui::new(window, None);
         Self {
             model,
             camera: Camera::default(),
@@ -410,6 +431,8 @@ impl TextureApp {
             base,
             descriptors,
             texture,
+            gui_renderer,
+            gui_context,
         }
     }
 }
@@ -539,6 +562,69 @@ impl WindowApp for TextureApp {
                 .unwrap()
         };
 
+        // // record_command_buffer
+        // {
+        //     let command_buffer = self.base.command_buffers[image_index as usize];
+        //     let frame_index = image_index as _;
+
+        //     unsafe {
+        //         self.base
+        //             .context
+        //             .device()
+        //             .reset_command_buffer(command_buffer, vk::CommandBufferResetFlags::empty())
+        //             .unwrap();
+        //     }
+
+        //     // begin command buffer
+        //     {
+        //         let command_buffer_begin_info = vk::CommandBufferBeginInfo::default()
+        //             .flags(vk::CommandBufferUsageFlags::SIMULTANEOUS_USE);
+        //         unsafe {
+        //             self.base
+        //                 .context
+        //                 .device()
+        //                 .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+        //                 .unwrap()
+        //         };
+        //     }
+
+        //     self.cmd_draw(command_buffer, frame_index, None);
+
+        //     // End command buffer
+        //     unsafe {
+        //         self.base
+        //             .context
+        //             .device()
+        //             .end_command_buffer(command_buffer)
+        //             .unwrap()
+        //     };
+        // }
+
+        if !self.base.in_flight_frames.gui_textures_to_free.is_empty() {
+            self.gui_renderer
+                .free_textures(&self.base.in_flight_frames.gui_textures_to_free)
+                .unwrap();
+        }
+        let ui_render_data = {
+            let render_data = self.gui_context.render(window);
+
+            self.base.in_flight_frames.gui_textures_to_free.clear();
+            self.base
+                .in_flight_frames
+                .gui_textures_to_free
+                .extend_from_slice(&render_data.textures_delta.free);
+
+            self.gui_renderer
+                .set_textures(
+                    self.base.context.graphics_compute_queue(),
+                    self.base.context.transient_command_pool(),
+                    &render_data.textures_delta.set,
+                )
+                .unwrap();
+
+            Some(render_data)
+        };
+
         // record_command_buffer
         {
             let command_buffer = self.base.command_buffers[image_index as usize];
@@ -565,7 +651,7 @@ impl WindowApp for TextureApp {
                 };
             }
 
-            self.cmd_draw(command_buffer, frame_index);
+            self.cmd_draw(command_buffer, frame_index, ui_render_data.as_ref());
 
             // End command buffer
             unsafe {
@@ -575,37 +661,37 @@ impl WindowApp for TextureApp {
                     .end_command_buffer(command_buffer)
                     .unwrap()
             };
-        }
 
-        // Submit command buffer
-        {
-            let wait_semaphore_submit_info = vk::SemaphoreSubmitInfo::default()
-                .semaphore(image_available_semaphore)
-                .stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT);
+            // Submit command buffer
+            {
+                let wait_semaphore_submit_info = vk::SemaphoreSubmitInfo::default()
+                    .semaphore(image_available_semaphore)
+                    .stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT);
 
-            let signal_semaphore_submit_info = vk::SemaphoreSubmitInfo::default()
-                .semaphore(render_finished_semaphore)
-                .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS);
+                let signal_semaphore_submit_info = vk::SemaphoreSubmitInfo::default()
+                    .semaphore(render_finished_semaphore)
+                    .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS);
 
-            let cmd_buffer_submit_info = vk::CommandBufferSubmitInfo::default()
-                .command_buffer(self.base.command_buffers[image_index as usize]);
+                let cmd_buffer_submit_info = vk::CommandBufferSubmitInfo::default()
+                    .command_buffer(self.base.command_buffers[image_index as usize]);
 
-            let submit_info = vk::SubmitInfo2::default()
-                .command_buffer_infos(std::slice::from_ref(&cmd_buffer_submit_info))
-                .wait_semaphore_infos(std::slice::from_ref(&wait_semaphore_submit_info))
-                .signal_semaphore_infos(std::slice::from_ref(&signal_semaphore_submit_info));
+                let submit_info = vk::SubmitInfo2::default()
+                    .command_buffer_infos(std::slice::from_ref(&cmd_buffer_submit_info))
+                    .wait_semaphore_infos(std::slice::from_ref(&wait_semaphore_submit_info))
+                    .signal_semaphore_infos(std::slice::from_ref(&signal_semaphore_submit_info));
 
-            unsafe {
-                self.base
-                    .context
-                    .synchronization2()
-                    .queue_submit2(
-                        self.base.context.graphics_compute_queue(),
-                        std::slice::from_ref(&submit_info),
-                        in_flight_fence,
-                    )
-                    .unwrap()
-            };
+                unsafe {
+                    self.base
+                        .context
+                        .synchronization2()
+                        .queue_submit2(
+                            self.base.context.graphics_compute_queue(),
+                            std::slice::from_ref(&submit_info),
+                            in_flight_fence,
+                        )
+                        .unwrap()
+                };
+            }
         }
 
         let swapchains = [self.base.swapchain.swapchain_khr()];
@@ -631,7 +717,12 @@ impl WindowApp for TextureApp {
         Ok(())
     }
 
-    fn cmd_draw(&mut self, command_buffer: vk::CommandBuffer, frame_index: usize) {
+    fn cmd_draw(
+        &mut self,
+        command_buffer: vk::CommandBuffer,
+        frame_index: usize,
+        ui_render_data: Option<&RenderData>,
+    ) {
         // Prepare attachments and inputs for lighting pass
         let transitions = vec![
             LayoutTransition {
@@ -765,6 +856,29 @@ impl WindowApp for TextureApp {
             // Draw skybox
             unsafe { device.cmd_draw_indexed(command_buffer, 6, 1, 0, 0, 0) };
 
+            // unsafe {
+            //     self.base
+            //         .context
+            //         .dynamic_rendering()
+            //         .cmd_end_rendering(command_buffer)
+            // };
+        }
+        if let Some(RenderData {
+            pixels_per_point,
+            clipped_primitives,
+            ..
+        }) = ui_render_data
+        {
+            let extent: Extent2D = self.base.swapchain.properties().extent;
+
+            self.gui_renderer
+                .cmd_draw(
+                    command_buffer,
+                    extent,
+                    *pixels_per_point,
+                    clipped_primitives,
+                )
+                .unwrap();
             unsafe {
                 self.base
                     .context
@@ -772,6 +886,7 @@ impl WindowApp for TextureApp {
                     .cmd_end_rendering(command_buffer)
             };
         }
+
         // Transition swapchain image for presentation
         {
             self.base.swapchain.images()[frame_index].cmd_transition_image_layout(

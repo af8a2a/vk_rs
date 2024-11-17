@@ -11,8 +11,7 @@ use winit::{
 };
 
 use crate::{
-    in_flight_frames::{InFlightFrames, SyncObjects},
-    Camera, Context, Image, ImageParameters, RenderError, Texture,
+    in_flight_frames::{InFlightFrames, SyncObjects}, Camera, Context, Image, ImageParameters, RenderData, RenderError, Texture, MAX_FRAMES_IN_FLIGHT
 };
 
 pub const SCENE_COLOR_FORMAT: vk::Format = vk::Format::R32G32B32A32_SFLOAT;
@@ -79,7 +78,7 @@ pub fn allocate_command_buffers(context: &Context, count: usize) -> Vec<vk::Comm
 pub fn create_sync_objects(context: &Arc<Context>) -> InFlightFrames {
     let device = context.device();
     let mut sync_objects_vec = Vec::new();
-    for _ in 0..2 {
+    for _ in 0..MAX_FRAMES_IN_FLIGHT {
         let image_available_semaphore = {
             let semaphore_info = vk::SemaphoreCreateInfo::default();
             unsafe { device.create_semaphore(&semaphore_info, None).unwrap() }
@@ -215,5 +214,5 @@ pub trait WindowApp {
     fn recreate_swapchain(&mut self, dimensions: [u32; 2], vsync: bool, hdr: bool);
     fn on_exit(&mut self) {}
     fn render(&mut self, window: &Window, camera: Camera) -> Result<(), RenderError>;
-    fn cmd_draw(&mut self, command_buffer: vk::CommandBuffer, frame_index: usize);
+    fn cmd_draw(&mut self, command_buffer: vk::CommandBuffer, frame_index: usize,ui_render_data: Option<&RenderData>);
 }

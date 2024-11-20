@@ -170,6 +170,8 @@ impl QuadModel {
 }
 
 pub struct TextureApp {
+    gui_renderer: Renderer,
+    gui_context: Gui,
     base: VulkanExampleBase,
     model: QuadModel,
     pipeline_layout: vk::PipelineLayout,
@@ -178,8 +180,6 @@ pub struct TextureApp {
     texture: Texture,
     camera: Camera,
     time: Instant,
-    gui_renderer: Renderer,
-    gui_context: Gui,
     dirty_swapchain: bool,
 }
 
@@ -437,6 +437,9 @@ impl TextureApp {
     }
 }
 
+
+
+
 impl WindowApp for TextureApp {
     fn new_frame(&mut self) {}
 
@@ -466,7 +469,7 @@ impl WindowApp for TextureApp {
         }
     }
 
-    fn handle_device_event(&mut self, event: &DeviceEvent) {
+    fn  handle_device_event(&mut self, event: &DeviceEvent) {
         // self.input_state = self.input_state.handle_device_event(event);
     }
 
@@ -856,12 +859,6 @@ impl WindowApp for TextureApp {
             // Draw skybox
             unsafe { device.cmd_draw_indexed(command_buffer, 6, 1, 0, 0, 0) };
 
-            // unsafe {
-            //     self.base
-            //         .context
-            //         .dynamic_rendering()
-            //         .cmd_end_rendering(command_buffer)
-            // };
         }
         if let Some(RenderData {
             pixels_per_point,
